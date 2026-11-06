@@ -356,13 +356,19 @@ class EyeGuardGammaEngine:
         mat = MAGCOLOREFFECT()
         lw = [0.299, 0.587, 0.114]
 
+        # Calculate blackbody radiator RGB factors for the current Kelvin (6500K is 1.0, 1.0, 1.0)
+        rf, gf, bf = kelvin_to_rgb_extended(k_clamped)
+
         theme_info = AUTHENTIC_READING_THEMES.get(mode)
         if mode == "custom":
             bg = parse_color_hex(self.custom_bg_hex, [1.0, 1.0, 1.0])
             txt = parse_color_hex(self.custom_txt_hex, [0.0, 0.0, 0.0])
             s = 0.25
-            diff = [bg[i] - txt[i] for i in range(3)]
-            bias = [txt[i] for i in range(3)]
+            # Modulate custom colors with kelvin warmth
+            bg_k = [bg[0] * rf, bg[1] * gf, bg[2] * bf]
+            txt_k = [txt[0] * rf, txt[1] * gf, txt[2] * bf]
+            diff = [bg_k[i] - txt_k[i] for i in range(3)]
+            bias = [txt_k[i] for i in range(3)]
             for r in range(3):
                 for c in range(3):
                     mat.transform[r][c] = b_clamped * ((1.0 - s) * lw[r] * diff[c] + (s * diff[c] if r == c else 0.0))
@@ -374,13 +380,17 @@ class EyeGuardGammaEngine:
                 b = b_clamped
                 for r in range(3):
                     for c in range(3):
-                        mat.transform[r][c] = lw[r] * b
+                        tint = [rf, gf, bf][c]
+                        mat.transform[r][c] = lw[r] * b * tint
             else:
                 bg = list(theme_info["bg"])
                 txt = list(theme_info["txt"])
                 s = float(theme_info.get("s", 0.25))
-                diff = [bg[i] - txt[i] for i in range(3)]
-                bias = [txt[i] for i in range(3)]
+                # Modulate palette colors with kelvin blackbody factors
+                bg_k = [bg[0] * rf, bg[1] * gf, bg[2] * bf]
+                txt_k = [txt[0] * rf, txt[1] * gf, txt[2] * bf]
+                diff = [bg_k[i] - txt_k[i] for i in range(3)]
+                bias = [txt_k[i] for i in range(3)]
                 for r in range(3):
                     for c in range(3):
                         mat.transform[r][c] = b_clamped * ((1.0 - s) * lw[r] * diff[c] + (s * diff[c] if r == c else 0.0))
@@ -695,8 +705,8 @@ class EyeGuardGammaEngine:
         if custom_txt:
             self.custom_txt_hex = str(custom_txt).strip()
         self.set_display(
-            self._applied_kelvin,
-            self._applied_brightness * 100.0,
+            self._current_kelvin,
+            self._current_brightness * 100.0,
             grayscale=False,
             invert=False,
             smooth=False,

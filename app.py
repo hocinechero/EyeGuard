@@ -403,6 +403,56 @@ class EyeGuardApp:
             except Exception:
                 pass
 
+
+def force_foreground_window(hwnd: int):
+    """
+    Guarantees window is brought to absolute foreground on top of all other windows,
+    bypassing Windows Foreground Lock Timeout via AttachThreadInput.
+    """
+    if not hwnd or not user32.IsWindow(hwnd):
+        return
+    try:
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        else:
+            user32.ShowWindow(hwnd, 5)  # SW_SHOW
+
+        fg_hwnd = user32.GetForegroundWindow()
+        if fg_hwnd and fg_hwnd != hwnd:
+            fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
+            cur_tid = kernel32.GetCurrentThreadId()
+            if fg_tid and cur_tid and fg_tid != cur_tid:
+                user32.AttachThreadInput(cur_tid, fg_tid, True)
+                user32.BringWindowToTop(hwnd)
+                user32.SetForegroundWindow(hwnd)
+                user32.AttachThreadInput(cur_tid, fg_tid, False)
+            else:
+                user32.BringWindowToTop(hwnd)
+                user32.SetForegroundWindow(hwnd)
+        else:
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+
+        # Multi-monitor bounds
+        vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+        vy = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+        vw = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+        vh = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+        if vw <= 0 or vh <= 0:
+            vx, vy = 0, 0
+            vw = user32.GetSystemMetrics(0)
+            vh = user32.GetSystemMetrics(1)
+
+        user32.SetWindowPos(
+            hwnd,
+            ctypes.c_void_p(-1),  # HWND_TOPMOST
+            vx, vy, vw, vh,
+            0x0020 | 0x0040  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
+        )
+        user32.UpdateWindow(hwnd)
+    except Exception:
+        pass
+
     def _enter_fullscreen_kiosk_mode(self, transparency_pct: int = 100):
         hwnd = self._get_main_hwnd()
         if not hwnd:
@@ -422,16 +472,7 @@ class EyeGuardApp:
                 user32.SetWindowLongW(hwnd, -20, ex | 0x00080000)  # WS_EX_LAYERED
                 alpha = max(140, min(255, int(255 * (transparency_pct / 100.0))))
                 user32.SetLayeredWindowAttributes(hwnd, 0, alpha, 2)
-            user32.SetWindowPos(
-                hwnd,
-                ctypes.c_void_p(-1),  # HWND_TOPMOST
-                0,
-                0,
-                sw,
-                sh,
-                0x0020 | 0x0040,  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
-            )
-            user32.SetForegroundWindow(hwnd)
+            force_foreground_window(hwnd)
         except Exception:
             pass
 
@@ -532,19 +573,19 @@ class EyeGuardApp:
             if rule_mode in preset_map:
                 pk, pb = preset_map[rule_mode]
                 self._rule_override_active = True
-                self.gamma_engine.set_display(pk, pb, self.is_gray, self.is_invert, smooth=True)
+                self.gamma_engine.set_display(pk, pb, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode)
             elif rule_mode == "dark":
                 self._rule_override_active = True
-                self.gamma_engine.set_display(self.current_k, self.current_b, self.is_gray, True, smooth=False)
+                self.gamma_engine.set_display(self.current_k, self.current_b, self.is_gray, True, smooth=False, color_mode=self.color_filter_mode)
             elif rule_mode == "grayscale":
                 self._rule_override_active = True
-                self.gamma_engine.set_display(self.current_k, self.current_b, True, self.is_invert, smooth=False)
+                self.gamma_engine.set_display(self.current_k, self.current_b, True, self.is_invert, smooth=False, color_mode=self.color_filter_mode)
             elif rule_mode == "warm":
                 self._rule_override_active = True
-                self.gamma_engine.set_display(3800, self.current_b, self.is_gray, self.is_invert, smooth=True)
+                self.gamma_engine.set_display(3800, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode)
             elif rule_mode == "exclude":
                 self._rule_override_active = True
-                self.gamma_engine.set_display(6500, 100, False, False, smooth=False)
+                self.gamma_engine.set_display(6500, 100, False, False, smooth=False, color_mode="normal")
             elif rule_mode in AUTHENTIC_READING_THEMES or rule_mode == "custom":
                 self._rule_override_active = True
                 self.gamma_engine.set_reading_theme(rule_mode, self.custom_bg_hex, self.custom_txt_hex)
@@ -593,6 +634,9 @@ class EyeGuardApp:
 
     def apply_preset_name(self, name: str):
         self._filter_disabled_until_ts = None
+        if self.circadian_active:
+            self.circadian_active = False
+            self.config_mgr.set("circadian", "enabled", False)
         self.config_mgr.set("screen", "mode", str(name))
         saved_presets = self.config_mgr.get("presets", default={}) or {}
         if name in saved_presets and isinstance(saved_presets[name], dict):
@@ -653,6 +697,9 @@ class EyeGuardApp:
 
     def set_kelvin(self, k: int):
         self._filter_disabled_until_ts = None
+        if self.circadian_active:
+            self.circadian_active = False
+            self.config_mgr.set("circadian", "enabled", False)
         self.current_k = max(1000, min(6500, int(k)))
         self.gamma_engine.set_display(
             self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=False, color_mode=self.color_filter_mode
@@ -662,6 +709,9 @@ class EyeGuardApp:
 
     def set_brightness(self, b: int):
         self._filter_disabled_until_ts = None
+        if self.circadian_active:
+            self.circadian_active = False
+            self.config_mgr.set("circadian", "enabled", False)
         self.current_b = max(5, min(100, int(b)))
         self.gamma_engine.set_display(
             self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=False, color_mode=self.color_filter_mode
@@ -905,9 +955,12 @@ class EyeGuardApp:
 
             self._was_hidden_before_break = self._is_window_hidden
             self.show_window()
+            main_h = self._get_main_hwnd()
+            if main_h:
+                force_foreground_window(main_h)
             if not _is_running_unit_tests():
                 threading.Timer(
-                    0.08,
+                    0.05,
                     lambda: self._enter_fullscreen_kiosk_mode(
                         int(tm_cfg.get("lock_screen_transparency", 100))
                     ),
@@ -1141,6 +1194,13 @@ class EyeGuardApp:
                         smooth=True,
                         color_mode=self.color_filter_mode,
                     )
+                    if self.config_mgr.get("circadian", "auto_windows_dark_mode", default=False):
+                        try:
+                            from core.windows_theme import set_windows_dark_mode
+                            is_dark_period = (st.get("stage") in ("sunset", "bedtime", "night"))
+                            set_windows_dark_mode(is_dark_period)
+                        except Exception:
+                            pass
                     self._schedule_tray_update()
                 except Exception:
                     pass
@@ -1902,6 +1962,30 @@ class JSBridgeApi:
         )
 
     # --- Circadian & Options API ---
+    def toggle_windows_dark_mode(self, enable):
+        val = bool(enable)
+        self._app.config_mgr.set("circadian", "auto_windows_dark_mode", val)
+        if val:
+            try:
+                from core.windows_theme import set_windows_dark_mode
+                st = self._app.solar_engine.get_solar_state_for_time()
+                is_dark_period = (st.get("stage") in ("sunset", "bedtime", "night"))
+                set_windows_dark_mode(is_dark_period)
+            except Exception:
+                pass
+        return {"success": True, "auto_windows_dark_mode": val}
+
+    def get_windows_dark_mode_state(self):
+        try:
+            from core.windows_theme import get_windows_dark_mode
+            is_dark = get_windows_dark_mode()
+        except Exception:
+            is_dark = False
+        return {
+            "auto_windows_dark_mode": self._app.config_mgr.get("circadian", "auto_windows_dark_mode", default=False),
+            "is_system_dark": is_dark,
+        }
+
     def toggle_circadian(self, enable):
         return self._app.toggle_circadian(bool(enable))
 

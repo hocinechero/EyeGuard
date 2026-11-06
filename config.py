@@ -52,7 +52,7 @@ DEFAULT_CONFIG = {
         "pre_break_prompt_sec": 30,
         "allow_delay_timer": True,
         "max_delay_times": 3,
-        "require_hold_3s_skip": False,
+        "require_hold_3s_skip": True,
         "break_mode": "fullscreen",
         "blink_reminder": False,
         "sound_enabled": True,
@@ -118,7 +118,8 @@ DEFAULT_CONFIG = {
         "bedtime_kelvin": 1900,
         "day_brightness": 100,
         "night_brightness": 80,
-        "bedtime_brightness": 55
+        "bedtime_brightness": 55,
+        "auto_windows_dark_mode": False
     },
     "hotkeys": {
         "brightness_up": "Ctrl + Alt + Up",
