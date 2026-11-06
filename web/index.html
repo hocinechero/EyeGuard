@@ -4263,42 +4263,14 @@
                     .sort();
 
                 if (uniqueRunning.length > 0) {
-                    const grpRunning = document.createElement('optgroup');
-                    grpRunning.label = `🟢 Currently Running Apps (${uniqueRunning.length})`;
                     uniqueRunning.forEach(exe => {
                         const opt = document.createElement('option');
                         opt.value = exe;
                         opt.innerText = exe;
                         if (exe === currentVal) opt.selected = true;
-                        grpRunning.appendChild(opt);
+                        sel.appendChild(opt);
                     });
-                    sel.appendChild(grpRunning);
                 }
-
-                // 2. Common Document Readers & Browsers
-                const COMMON_READERS = [
-                    { name: "Adobe Acrobat Reader", exe: "acrobat.exe" },
-                    { name: "Foxit PDF Reader", exe: "foxitreader.exe" },
-                    { name: "Google Chrome", exe: "chrome.exe" },
-                    { name: "Microsoft Edge", exe: "msedge.exe" },
-                    { name: "Brave Browser", exe: "brave.exe" },
-                    { name: "Mozilla Firefox", exe: "firefox.exe" },
-                    { name: "Microsoft Word", exe: "winword.exe" },
-                    { name: "Visual Studio Code", exe: "code.exe" },
-                    { name: "Windows Notepad", exe: "notepad.exe" },
-                    { name: "Obsidian", exe: "obsidian.exe" }
-                ];
-
-                const grpCommon = document.createElement('optgroup');
-                grpCommon.label = "📚 Common Document Readers & Browsers";
-                COMMON_READERS.forEach(item => {
-                    const opt = document.createElement('option');
-                    opt.value = item.exe;
-                    opt.innerText = `${item.name} (${item.exe})`;
-                    if (item.exe === currentVal && !sel.value) opt.selected = true;
-                    grpCommon.appendChild(opt);
-                });
-                sel.appendChild(grpCommon);
 
             } catch (e) {
                 console.error('Failed to fetch running reader apps:', e);
