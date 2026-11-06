@@ -3727,11 +3727,23 @@
             updateSpotlightHeroBtn(isActive);
         }
 
+        let heroSpotDebounce = null;
         function handleHeroSpotlightOpacity(val) {
-            document.getElementById('val-hero-spot-op').innerText = val + '%';
-            const el = document.getElementById('slider-spot-op');
-            if (el) { el.value = val; }
-            updateSpotlightSettings();
+            const pct = parseInt(val) || 60;
+            const v = document.getElementById('val-hero-spot-op');
+            if (v) v.innerText = pct + '%';
+            const s = document.getElementById('slider-hero-spot-op');
+            if (s && s.value != pct) s.value = pct;
+            if (heroSpotDebounce) clearTimeout(heroSpotDebounce);
+            heroSpotDebounce = setTimeout(() => {
+                if (window.pywebview && window.pywebview.api) {
+                    if (window.pywebview.api.set_spotlight_opacity) {
+                        window.pywebview.api.set_spotlight_opacity(pct / 100.0);
+                    } else if (window.pywebview.api.configure_spotlight) {
+                        window.pywebview.api.configure_spotlight(null, pct / 100.0);
+                    }
+                }
+            }, 25);
         }
 
         function switchNav(tabId) {
@@ -4844,7 +4856,7 @@
             const slAnim = document.getElementById('slider-spot-anim');
             const vAnim = document.getElementById('val-spot-anim');
             const chkMonitor = document.getElementById('chk-spot-monitor');
-            const slOp = document.getElementById('slider-spot-op');
+            const slOp = document.getElementById('slider-hero-spot-op') || document.getElementById('slider-spot-op');
             const vOp = document.getElementById('val-spot-op');
             const inColor = document.getElementById('input-spot-color');
 
