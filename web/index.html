@@ -2021,7 +2021,7 @@
                         <input type="range" class="range-slider" dir="ltr" id="slider-kelvin" min="1000" max="6500" value="6500" oninput="handleKelvinChange(this.value)">
                     </div>
                     <div dir="ltr" style="position: relative; display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); line-height: 1.2; padding-top: 4px;">
-                        <span id="lbl-min-k" style="z-index: 1;">1000 K (Ruby Warmth)</span>
+                        <span id="lbl-min-k" style="z-index: 1;">1000 K (Deep Ruby Red)</span>
                         <span id="lbl-current-desc" style="position: absolute; left: 50%; transform: translateX(-50%); color: var(--accent-teal); font-weight: 600; text-align: center; pointer-events: none; z-index: 2;">Balanced Office Comfort</span>
                         <span id="lbl-max-k" style="z-index: 1;">6500 K (Original Screen)</span>
                     </div>
@@ -3093,8 +3093,8 @@
 
                         <div class="form-row">
                             <div>
-                                <div class="form-label" id="s-ext-title" style="color:#fbbf24;">Use wider color temperature range (1000K - 10000K)</div>
-                                <div style="font-size:10px; color:var(--text-tertiary);" id="s-ext-desc">Unlocks 1000K Ruby Darkroom and 10,000K Arctic Sky color temperatures</div>
+                                <div class="form-label" id="s-ext-title" style="color:#fbbf24;">Unlock Deep Ruby Red Darkroom (1000K)</div>
+                                <div style="font-size:10px; color:var(--text-tertiary);" id="s-ext-desc">Unlocks 1000K Deep Ruby Red night vision with zero blue & zero green light</div>
                             </div>
                             <input type="checkbox" id="chk-ext-range" checked onchange="handleExtendedRangeToggle(this.checked)">
                         </div>
@@ -3356,8 +3356,8 @@
                 circadianEnableDesc: "Sunrise (06:30 AM) | Sunset (06:30 PM)",
 
                 settingsHeader: "Advanced System Options",
-                extRangeTitle: "Unlock Extended Kelvin Range (1,000K to 10,000K)",
-                extRangeDesc: "Access extreme ruby darkroom night vision (1000K) and arctic polar sky (10,000K)",
+                extRangeTitle: "Unlock Deep Ruby Red Range (1000K - 6500K)",
+                extRangeDesc: "Access extreme ruby darkroom night vision (1000K) with zero blue & zero green light",
                 trayTitle: "Minimize to System Tray on Close",
                 trayDesc: "Silently runs in the background taskbar tray",
                 hotkeysHeader: "Global Keyboard Shortcuts",
@@ -3384,10 +3384,10 @@
                 breathHold: "Hold...",
                 breathExhale: "Exhale...",
 
-                kMinExt: "1000 K (Ruby Night Vision)",
-                kMaxExt: "10,000 K (Polar Sky)",
-                kMinStd: "1800 K (Min Warm)",
-                kMaxStd: "6500 K (Daylight)"
+                kMinExt: "1000 K (Deep Ruby Red)",
+                kMaxExt: "6500 K (Original Screen)",
+                kMinStd: "1900 K (Candlelight)",
+                kMaxStd: "6500 K (Original Screen)"
             },
             en: {
                 sbSubtitle: "by @hocine_chero",
@@ -3447,8 +3447,8 @@
                 circadianEnableDesc: "Sunrise (06:30 AM) | Sunset (06:30 PM)",
 
                 settingsHeader: "Advanced System Options",
-                extRangeTitle: "Unlock Extended Kelvin Range (1,000K to 10,000K)",
-                extRangeDesc: "Access extreme ruby darkroom night vision (1000K) and arctic polar sky (10,000K)",
+                extRangeTitle: "Unlock Deep Ruby Red Range (1000K - 6500K)",
+                extRangeDesc: "Access extreme ruby darkroom night vision (1000K) with zero blue & zero green light",
                 trayTitle: "Minimize to System Tray on Close",
                 trayDesc: "Silently runs in the background taskbar tray",
                 hotkeysHeader: "Global Keyboard Shortcuts",
@@ -3475,10 +3475,10 @@
                 breathHold: "Hold...",
                 breathExhale: "Exhale...",
 
-                kMinExt: "1000 K (Ruby Night Vision)",
-                kMaxExt: "10,000 K (Polar Sky)",
-                kMinStd: "1800 K (Min Warm)",
-                kMaxStd: "6500 K (Daylight)"
+                kMinExt: "1000 K (Deep Ruby Red)",
+                kMaxExt: "6500 K (Original Screen)",
+                kMinStd: "1900 K (Candlelight)",
+                kMaxStd: "6500 K (Original Screen)"
             }
         };
 
@@ -3894,8 +3894,8 @@
             else if (k < 2200) desc = "Warm Candlelight";
             else if (k < 3500) desc = "Warm Bedtime";
             else if (k < 5200) desc = "Balanced Office Comfort";
-            else if (k <= 6800) desc = "3800 K (Balanced Daylight)";
-            else desc = "Cool North Sky";
+            else if (k <= 6499) desc = "Natural Daylight";
+            else desc = "Original Native Screen (6500K)";
 
             const descEl = document.getElementById('lbl-current-desc');
             if (descEl) descEl.innerText = desc;
@@ -3914,8 +3914,7 @@
             else if (k < 4800) modeTitle = "Focused Reading";
             else if (k <= 5400) modeTitle = "Healthy & Balanced";
             else if (k <= 6200) modeTitle = "Office Work";
-            else if (k <= 6800) modeTitle = "Natural Daylight";
-            else modeTitle = "Arctic Sky";
+            else modeTitle = "Natural Screen (6500K)";
 
             badge.innerText = `${modeTitle} (${k}K)`;
         }
@@ -3980,9 +3979,9 @@
             if (enabled) {
                 if (sk) {
                     sk.min = '1000';
-                    sk.max = '10000';
+                    sk.max = '6500';
                 }
-                if (lblMin) lblMin.innerText = '1000 K (Ruby Warmth)';
+                if (lblMin) lblMin.innerText = '1000 K (Deep Ruby Red)';
                 if (lblMax) lblMax.innerText = '6500 K (Original Screen)';
             } else {
                 if (sk) {
@@ -4007,7 +4006,10 @@
                 if (lblMin) lblMin.innerText = '1900 K (Candlelight)';
                 if (lblMax) lblMax.innerText = '6500 K (Original Screen)';
             }
-            if (sk) sk.value = currentK;
+            if (sk) {
+                if (currentK > 6500) currentK = 6500;
+                sk.value = currentK;
+            }
             if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_extended_range) {
                 window.pywebview.api.toggle_extended_range(enabled);
             }
@@ -4018,7 +4020,7 @@
             const parsed = parseInt(val);
             const sk = document.getElementById('slider-kelvin');
             const minK = sk ? (parseInt(sk.min) || 1000) : 1000;
-            const maxK = sk ? (parseInt(sk.max) || 10000) : 10000;
+            const maxK = sk ? (parseInt(sk.max) || 6500) : 6500;
             currentK = isNaN(parsed) ? 5000 : Math.max(Math.max(1000, minK), Math.min(maxK, parsed));
             updateKelvinText(currentK);
             updatePresetBadge();

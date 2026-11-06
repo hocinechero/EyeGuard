@@ -203,7 +203,7 @@ class ConfigManager:
             b = int(scr.get("brightness", 85))
             ext_k = bool(scr.get("unlock_extended_range", True))
             ext_b = bool(scr.get("wider_brightness_range", True))
-            min_k, max_k = (0, 10000) if ext_k else (1900, 6500)
+            min_k, max_k = (1000, 6500) if ext_k else (1900, 6500)
             min_b = 5 if ext_b else 25
             scr["kelvin"] = max(min_k, min(max_k, k))
             scr["brightness"] = max(min_b, min(100, b))

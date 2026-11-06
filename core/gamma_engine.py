@@ -75,47 +75,39 @@ MonitorEnumProc = ctypes.WINFUNCTYPE(
 
 def kelvin_to_rgb_extended(kelvin: float):
     """
-    Continuous Blackbody Radiator Color Temperature Engine (1,000K to 10,000K):
-    Calculates sRGB chromaticity coordinates based on Planckian blackbody locus
-    polynomial approximations (Tanner Helland formulation, Public Domain, 2012).
+    Continuous Blackbody & Deep Ruby Astronomical Color Temperature Engine (1,000K to 6,500K):
     - 6500K: Standard D65 Native Screen (1.0, 1.0, 1.0) with zero tinting.
-    - 6500K to 10,000K: Smooth daylight blackbody curve to cool blue sky.
-    - 1900K to 6500K: Natural blue-light attenuation protecting circadian rhythm.
-    - 1000K to 1900K: Deep darkroom and candlelight ember mode.
+    - 1900K to 6500K: Circadian blackbody curve (blue light filtered down to zero at 1900K).
+    - 1000K to 1900K: Continuous deep ruby transition (green smoothly attenuated to zero at 1000K for authentic 100% monochromatic red).
     """
-    k = max(1000.0, min(10000.0, float(kelvin)))
+    k = max(1000.0, min(6500.0, float(kelvin)))
     if abs(k - 6500.0) < 5.0:
         return 1.0, 1.0, 1.0
 
     temp = k / 100.0
+    r = 1.0
 
-    # Red component
-    if temp <= 66.0:
-        r = 1.0
-    else:
-        r = 329.698727446 * ((temp - 60.0) ** -0.1332047592) / 255.0
-        r = max(0.0, min(1.0, r))
+    g_d65 = (99.4708025861 * math.log(65.0) - 161.1195681661) / 255.0
 
-    # Green component
-    if temp <= 66.0:
-        g = (99.4708025861 * math.log(temp) - 161.1195681661) / 255.0
+    # Green component: smoothly attenuate down to 0 at 1000K for authentic deep ruby
+    if temp <= 19.0:
+        g_1900 = ((99.4708025861 * math.log(19.0) - 161.1195681661) / 255.0) / g_d65
+        t_ratio = max(0.0, min(1.0, (k - 1000.0) / (1900.0 - 1000.0)))
+        g = g_1900 * (t_ratio ** 1.2)
+    elif temp <= 66.0:
+        g = ((99.4708025861 * math.log(temp) - 161.1195681661) / 255.0) / g_d65
     else:
-        g = (288.1221695283 * ((temp - 60.0) ** -0.0755148492)) / 255.0
+        g = 1.0
     g = max(0.0, min(1.0, g))
 
-    # Blue component
-    if temp >= 66.0:
-        b = 1.0
-    elif temp <= 19.0:
+    # Blue component: zero below 1900K
+    if temp <= 19.0:
         b = 0.0
+    elif temp >= 65.0:
+        b = 1.0
     else:
         b = (138.5177312231 * math.log(temp - 10.0) - 305.0447927307) / 255.0
         b = max(0.0, min(1.0, b))
-
-    # Normalize green so D65 (6500K) is exactly (1.0, 1.0, 1.0)
-    g_d65 = (99.4708025861 * math.log(65.0) - 161.1195681661) / 255.0
-    if temp <= 66.0:
-        g = min(1.0, g / g_d65)
 
     return max(0.0, min(1.0, r)), max(0.0, min(1.0, g)), max(0.0, min(1.0, b))
 
@@ -316,7 +308,7 @@ class EyeGuardGammaEngine:
         if not _HAS_MAGNIFICATION:
             return
 
-        k_clamped = max(0.0, min(10000.0, float(kelvin)))
+        k_clamped = max(1000.0, min(6500.0, float(kelvin)))
         b_clamped = max(0.05, min(1.0, float(brightness)))
         
         mode = str(color_mode if color_mode is not None else self.color_mode or "normal").lower().strip()
@@ -651,7 +643,7 @@ class EyeGuardGammaEngine:
     ):
         raw_b = float(brightness_pct)
         b_val = max(0.05, min(1.0, raw_b / 100.0 if raw_b > 1.0 else raw_b))
-        k_val = max(0.0, min(10000.0, float(kelvin)))
+        k_val = max(1000.0, min(6500.0, float(kelvin)))
 
         self._current_kelvin = k_val
         self._current_brightness = b_val

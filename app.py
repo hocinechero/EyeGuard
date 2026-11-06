@@ -254,7 +254,7 @@ class EyeGuardApp:
             self.current_k = 6500
         else:
             try:
-                self.current_k = max(1000, min(10000, int(raw_k)))
+                self.current_k = max(1000, min(6500, int(raw_k)))
             except Exception:
                 self.current_k = 6500
 
@@ -598,7 +598,7 @@ class EyeGuardApp:
         if name in saved_presets and isinstance(saved_presets[name], dict):
             k = int(saved_presets[name].get("kelvin", 5000))
             b = int(saved_presets[name].get("brightness", 85))
-            self.current_k = max(1000, min(10000, k))
+            self.current_k = max(1000, min(6500, k))
             self.current_b = max(5, min(100, b))
             self.gamma_engine.set_display(
                 self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
@@ -653,7 +653,7 @@ class EyeGuardApp:
 
     def set_kelvin(self, k: int):
         self._filter_disabled_until_ts = None
-        self.current_k = max(1000, min(10000, int(k)))
+        self.current_k = max(1000, min(6500, int(k)))
         self.gamma_engine.set_display(
             self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=False, color_mode=self.color_filter_mode
         )
@@ -1359,7 +1359,7 @@ class EyeGuardApp:
             "brightness_up": lambda: self.set_brightness(min(100, self.current_b + 5)),
             "brightness_down": lambda: self.set_brightness(max(5, self.current_b - 5)),
             "kelvin_warmer": lambda: self.set_kelvin(max(1000, self.current_k - 250)),
-            "kelvin_cooler": lambda: self.set_kelvin(min(10000, self.current_k + 250)),
+            "kelvin_cooler": lambda: self.set_kelvin(min(6500, self.current_k + 250)),
             "reset_natural": lambda: (self.set_kelvin(6500), self.set_brightness(100)),
             "toggle_ruler": self.toggle_focus_ruler,
             "toggle_spotlight": lambda: self.toggle_spotlight_focus(),
