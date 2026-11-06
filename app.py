@@ -552,12 +552,23 @@ class EyeGuardApp:
     def _on_blink_reminder(self):
         tm = self.config_mgr.get("timer", default={}) or {}
         pos = str(tm.get("reminder_popup_pos", "top_center"))
+        lang = str(self.config_mgr.get("general", {}).get("language", "en"))
+        if lang == "ar":
+            tag = "ترطيب القرنية وتجديد الدموع"
+            msg = "أغمض جفنيك بلطف الآن لدعم الرطوبة وتنشيط التركيز"
+        else:
+            tag = "TEAR FILM HYDRATION"
+            msg = "Blink gently now to refresh your ocular focus"
         self.desktop_overlays.show_toast(
-            title="Blink Reminder — Blink Gently Now",
-            subtitle="Relax your ocular muscles with a slow, complete blink.",
+            title=tag,
+            subtitle=msg,
             position=pos,
             duration_sec=4.0,
         )
+
+    def trigger_blink_preview(self):
+        """Immediately trigger the native desktop blink reminder toast for testing."""
+        self._on_blink_reminder()
 
     def _on_app_rule_trigger(self, rule_mode):
         """Called by MagicWindowEngine when foreground app matches an Auto Dark / Smart App Rule."""
@@ -1927,6 +1938,9 @@ class JSBridgeApi:
 
     def preview_break_mode(self):
         self._app.preview_break_mode()
+
+    def trigger_blink_preview(self):
+        self._app.trigger_blink_preview()
 
     def set_blink_reminder(self, enabled):
         return self._app.set_blink_reminder(bool(enabled))
