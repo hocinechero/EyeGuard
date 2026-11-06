@@ -23,6 +23,7 @@ hiddenimports = [
     'config',
     'core',
     'core.gamma_engine',
+    'core.windows_theme',
     'core.window_focus',
     'core.crash_guard',
     'core.system_events',

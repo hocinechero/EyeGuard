@@ -2574,6 +2574,17 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="form-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-default);">
+                        <div>
+                            <div class="form-label" id="c-dark-title" style="color:var(--text-primary); font-weight:600;">Synchronize Windows Dark Mode</div>
+                            <div style="font-size:10px; color:var(--text-tertiary);" id="c-dark-desc">Automatically switches Windows system & apps between Light (Day) and Dark (Sunset/Night)</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="chk-auto-dark" onchange="toggleAutoDarkMode(this.checked)">
+                            <span class="toggle-track"></span>
+                        </label>
+                    </div>
                 </div>
                 </div>
 
@@ -3354,6 +3365,8 @@
                 circadianHeroDesc: "Synchronizes display colors with natural biological rhythms; energetic morning tones and warm sunset hues.",
                 circadianEnableTitle: "Enable Circadian Automation",
                 circadianEnableDesc: "Sunrise (06:30 AM) | Sunset (06:30 PM)",
+                cDarkTitle: "مزامنة الوضع الداكن لويندوز تلقائياً",
+                cDarkDesc: "تبديل ثيم ويندوز وتطبيقات النظام بين النهاري الفاتح والليلي الداكن حسب دورة الشمس",
 
                 settingsHeader: "Advanced System Options",
                 extRangeTitle: "Unlock Deep Ruby Red Range (1000K - 6500K)",
@@ -3445,6 +3458,8 @@
                 circadianHeroDesc: "Synchronizes display colors with natural biological rhythms; energetic morning tones and warm sunset hues.",
                 circadianEnableTitle: "Enable Circadian Automation",
                 circadianEnableDesc: "Sunrise (06:30 AM) | Sunset (06:30 PM)",
+                cDarkTitle: "Synchronize Windows Dark Mode",
+                cDarkDesc: "Automatically switches Windows system & apps between Light (Day) and Dark (Sunset/Night)",
 
                 settingsHeader: "Advanced System Options",
                 extRangeTitle: "Unlock Deep Ruby Red Range (1000K - 6500K)",
@@ -3560,6 +3575,12 @@
             blinkToastTimer = setTimeout(() => {
                 toast.style.display = 'none';
             }, 4000);
+        }
+
+        async function toggleAutoDarkMode(enabled) {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_windows_dark_mode) {
+                await window.pywebview.api.toggle_windows_dark_mode(enabled);
+            }
         }
 
         async function toggleCircadian(enabled) {
@@ -3853,6 +3874,8 @@
             setTxt('c-hero-desc', d.circadianHeroDesc);
             setTxt('c-enable-title', d.circadianEnableTitle);
             setTxt('c-enable-desc', d.circadianEnableDesc);
+            setTxt('c-dark-title', d.cDarkTitle);
+            setTxt('c-dark-desc', d.cDarkDesc);
 
             setTxt('lbl-settings-header', d.settingsHeader);
             setTxt('s-ext-title', d.extRangeTitle);
@@ -5850,6 +5873,13 @@
                                 const cc = document.getElementById('chk-circadian');
                                 if (cc) cc.checked = st.circadian_active;
                             }
+                            if (window.pywebview && window.pywebview.api && window.pywebview.api.get_windows_dark_mode_state) {
+                                try {
+                                    const dSt = await window.pywebview.api.get_windows_dark_mode_state();
+                                    const chkDark = document.getElementById('chk-auto-dark');
+                                    if (chkDark && dSt) chkDark.checked = !!dSt.auto_windows_dark_mode;
+                                } catch (e) {}
+                            }
                             if (typeof st.timer_enabled === 'boolean') {
                                 const bm = document.getElementById('chk-break-master');
                                 if (bm) bm.checked = st.timer_enabled;
@@ -6023,6 +6053,10 @@
                             showBlinkToast();
                         }
 
+                        if (typeof st.circadian_active === 'boolean') {
+                            const cc = document.getElementById('chk-circadian');
+                            if (cc && cc.checked !== st.circadian_active) cc.checked = st.circadian_active;
+                        }
                         if (st.circadian_active && st.current_k && Math.abs(currentK - st.current_k) > 10) {
                             window.onCircadianUpdate(st.current_k);
                         }
