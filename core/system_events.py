@@ -146,7 +146,7 @@ class SystemEventsMonitor:
             return
 
         self._hwnd = user32.CreateWindowExW(
-            0, atom, "EyeGuardEvents", 0, 0, 0, 0, 0, 0, 0, h_inst, 0
+            0, class_name, "EyeGuardEvents", 0, 0, 0, 0, 0, 0, 0, h_inst, 0
         )
 
         msg = wintypes.MSG()
@@ -156,7 +156,7 @@ class SystemEventsMonitor:
 
         if self._hwnd:
             user32.DestroyWindow(self._hwnd)
-        user32.UnregisterClassW(atom, h_inst)
+        user32.UnregisterClassW(class_name, h_inst)
 
     def _trigger_resume(self):
         if self._on_resume:
