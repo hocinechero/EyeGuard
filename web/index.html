@@ -3729,6 +3729,9 @@
 
         let blinkToastTimer = null;
         function showBlinkToast() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.trigger_blink_preview) {
+                try { window.pywebview.api.trigger_blink_preview(); } catch (e) {}
+            }
             const toast = document.getElementById('blink-reminder-toast');
             if (!toast) return;
             const bar = document.getElementById('blink-progress-bar-circle');
