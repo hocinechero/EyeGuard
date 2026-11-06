@@ -549,7 +549,7 @@ class DesktopOverlayManager:
             r1 = wintypes.RECT(10, 8, w - 10, 32)
             user32.DrawTextW(
                 hdc,
-                f"👁  {self.toast_title}",
+                f"●  {self.toast_title}",
                 -1,
                 ctypes.byref(r1),
                 DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,

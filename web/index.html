@@ -1499,24 +1499,162 @@
             border-color: rgba(239, 68, 68, 0.4);
         }
 
-        /* Blink Reminder Toast Animation */
+        /* Blink Reminder Toast Animation — Dynamic Island Glassmorphism */
         #blink-reminder-toast {
             position: fixed;
-            top: 18px;
+            top: 24px;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translateX(-50%) translateY(-24px) scale(0.95);
             z-index: 99990;
-            background: rgba(15, 23, 42, 0.94);
-            border: 1px solid var(--accent-teal);
-            border-radius: var(--radius-full);
-            padding: 6px 16px;
-            display: none;
+            background: rgba(13, 17, 23, 0.90);
+            backdrop-filter: blur(28px) saturate(190%);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-top: 1px solid rgba(45, 212, 191, 0.50);
+            border-radius: 9999px;
+            padding: 8px 16px 8px 12px;
+            display: flex;
             align-items: center;
-            gap: 8px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+            gap: 12px;
+            box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.75), 0 0 24px -2px rgba(20, 184, 166, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.18);
             color: #fff;
-            font-size: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1), transform 350ms cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
+        }
+
+        #blink-reminder-toast.active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .blink-icon-orb {
+            position: relative;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.28), rgba(13, 148, 136, 0.12));
+            border: 1px solid rgba(45, 212, 191, 0.40);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 0 16px rgba(20, 184, 166, 0.40);
+        }
+
+        .blink-eyelid-anim {
+            transform-origin: center;
+            animation: eyelidBlink 3.0s infinite ease-in-out;
+        }
+
+        @keyframes eyelidBlink {
+            0%, 40%, 48%, 56%, 100% {
+                transform: scaleY(1);
+            }
+            44%, 52% {
+                transform: scaleY(0.08);
+            }
+        }
+
+        .blink-droplet-glow {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 9px;
+            height: 9px;
+            background: #2dd4bf;
+            border: 2px solid #0d1117;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #2dd4bf;
+            animation: dropletPulse 2s infinite ease-in-out;
+        }
+
+        @keyframes dropletPulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.3); opacity: 1; filter: drop-shadow(0 0 6px #5eead4); }
+        }
+
+        .blink-toast-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            line-height: 1.25;
+            text-align: left;
+        }
+        [dir="rtl"] .blink-toast-content {
+            text-align: right;
+        }
+
+        .blink-toast-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #2dd4bf;
+        }
+
+        .blink-toast-pill .pill-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #2dd4bf;
+            box-shadow: 0 0 6px #2dd4bf;
+        }
+
+        .blink-toast-msg {
+            font-size: 12.5px;
             font-weight: 600;
+            color: #f1f5f9;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+        }
+
+        .blink-progress-ring {
+            width: 18px;
+            height: 18px;
+            transform: rotate(-90deg);
+            margin-left: 2px;
+            flex-shrink: 0;
+        }
+
+        .blink-progress-ring circle {
+            fill: none;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+        }
+
+        .blink-progress-track {
+            stroke: rgba(255, 255, 255, 0.12);
+        }
+
+        .blink-progress-bar {
+            stroke: #2dd4bf;
+            stroke-dasharray: 44;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 4.2s linear;
+        }
+
+        .blink-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: color 150ms, background 150ms;
+            margin-left: 2px;
+        }
+        .blink-close-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.12);
         }
 
         /* Fullscreen Break Modal */
@@ -1850,10 +1988,29 @@
 </head>
 <body>
 
-    <!-- Subtle Animated Blink Reminder Toast -->
+    <!-- Cutting-Edge Dynamic Island Glassmorphic Blink Toast -->
     <div id="blink-reminder-toast">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span id="txt-blink-toast">Blink gently to keep your cornea hydrated and prevent dry eyes...</span>
+        <div class="blink-icon-orb">
+            <svg class="blink-eyelid-anim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+                <circle cx="12" cy="12" r="3.2" fill="#2dd4bf"/>
+            </svg>
+            <div class="blink-droplet-glow"></div>
+        </div>
+        <div class="blink-toast-content">
+            <div class="blink-toast-pill">
+                <span class="pill-dot"></span>
+                <span id="txt-blink-toast-tag">Tear Film Hydration</span>
+            </div>
+            <span class="blink-toast-msg" id="txt-blink-toast">Blink gently twice to refresh your cornea & relax focus</span>
+        </div>
+        <svg class="blink-progress-ring" viewBox="0 0 18 18">
+            <circle class="blink-progress-track" cx="9" cy="9" r="7"/>
+            <circle class="blink-progress-bar" id="blink-progress-bar-circle" cx="9" cy="9" r="7"/>
+        </svg>
+        <button class="blink-close-btn" onclick="dismissBlinkToast()" title="Dismiss">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
     </div>
 
     <!-- Desktop Mini Floating Timer HUD -->
@@ -2407,10 +2564,15 @@
                             <h4 id="t-blink-title">Blink reminder</h4>
                             <p id="t-blink-desc">Reminds you to blink</p>
                         </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="chk-blink-reminder" onchange="toggleBlinkReminder(this.checked)">
-                            <span class="toggle-track"></span>
-                        </label>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button type="button" class="topbar-action-pill" onclick="showBlinkToast()" style="font-size:10.5px; padding:2px 8px; height:24px; border-radius:9999px; border:1px solid rgba(45,212,191,0.3); background:rgba(20,184,166,0.12); color:#2dd4bf; cursor:pointer;" title="Preview Blink Animation">
+                                <span id="btn-preview-blink">Preview</span>
+                            </button>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="chk-blink-reminder" onchange="toggleBlinkReminder(this.checked)">
+                                <span class="toggle-track"></span>
+                            </label>
+                        </div>
                     </div>
                     <div class="setting-card" style="margin-bottom:0;">
                         <div class="setting-titles">
@@ -3569,12 +3731,40 @@
         function showBlinkToast() {
             const toast = document.getElementById('blink-reminder-toast');
             if (!toast) return;
-            toast.style.display = 'flex';
-            toast.style.opacity = '1';
+            const bar = document.getElementById('blink-progress-bar-circle');
+            
+            const tag = document.getElementById('txt-blink-toast-tag');
+            const msg = document.getElementById('txt-blink-toast');
+            if (currentLang === 'ar') {
+                if (tag) tag.innerText = 'ترطيب القرنية وتجديد الدموع';
+                if (msg) msg.innerText = 'ارمِش بعينيك بلطف مرتين لترطيب سطح العين وإراحة عضلات التركيز';
+            } else {
+                if (tag) tag.innerText = 'Tear Film Hydration';
+                if (msg) msg.innerText = 'Blink gently twice to replenish tear film & relax focus';
+            }
+
+            toast.classList.remove('active');
+            if (bar) bar.style.strokeDashoffset = '0';
+            void toast.offsetWidth;
+
+            toast.classList.add('active');
+            if (bar) {
+                setTimeout(() => { bar.style.strokeDashoffset = '44'; }, 30);
+            }
+
             if (blinkToastTimer) clearTimeout(blinkToastTimer);
             blinkToastTimer = setTimeout(() => {
-                toast.style.display = 'none';
-            }, 4000);
+                dismissBlinkToast();
+            }, 4200);
+        }
+
+        function dismissBlinkToast() {
+            const toast = document.getElementById('blink-reminder-toast');
+            if (toast) toast.classList.remove('active');
+            if (blinkToastTimer) {
+                clearTimeout(blinkToastTimer);
+                blinkToastTimer = null;
+            }
         }
 
         async function toggleAutoDarkMode(enabled) {
