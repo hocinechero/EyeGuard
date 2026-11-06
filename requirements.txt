@@ -1,0 +1,8 @@
+# EyeGuard Core Runtime Dependencies
+pywebview>=5.1.0
+Pillow>=10.2.0
+pystray>=0.19.5
+pywin32>=306
+
+# Optional Build Dependencies (for packaging standalone binaries)
+# pyinstaller>=6.5.0

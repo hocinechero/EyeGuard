@@ -1,0 +1,39 @@
+# ==========================================
+# EyeGuard — Git Ignore
+# ==========================================
+
+# Compiled Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# PyInstaller build artifacts & distribution binaries
+# (Binaries should be published via GitHub Releases, not checked into git)
+build/
+dist/
+
+# Scratch & development experiments
+scratch/
+*.log
+*.tmp
+*.bak
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE & Editor configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Windows OS metadata
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

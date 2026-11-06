@@ -1,0 +1,8 @@
+EyeGuard
+Copyright (c) 2026 @hocine_chero
+
+This software incorporates mathematical models and formulations:
+- Blackbody color temperature approximation based on the Planckian locus 
+  and public domain formulation by Tanner Helland (2012).
+- Windows Desktop Window Manager (DWM) composition interfaces via the 
+  documented Windows Magnification and GDI APIs.
