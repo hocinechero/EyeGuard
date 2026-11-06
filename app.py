@@ -154,6 +154,57 @@ HOTKEY_METADATA = [
 ]
 
 
+def force_foreground_window(hwnd: int):
+    """
+    Guarantees window is brought to absolute foreground on top of all other windows,
+    bypassing Windows Foreground Lock Timeout via AttachThreadInput.
+    """
+    if not hwnd or not user32.IsWindow(hwnd):
+        return
+    try:
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        else:
+            user32.ShowWindow(hwnd, 5)  # SW_SHOW
+
+        fg_hwnd = user32.GetForegroundWindow()
+        if fg_hwnd and fg_hwnd != hwnd:
+            fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
+            cur_tid = kernel32.GetCurrentThreadId()
+            if fg_tid and cur_tid and fg_tid != cur_tid:
+                user32.AttachThreadInput(cur_tid, fg_tid, True)
+                user32.BringWindowToTop(hwnd)
+                user32.SetForegroundWindow(hwnd)
+                user32.AttachThreadInput(cur_tid, fg_tid, False)
+            else:
+                user32.BringWindowToTop(hwnd)
+                user32.SetForegroundWindow(hwnd)
+        else:
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+
+        # Multi-monitor bounds
+        vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+        vy = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+        vw = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+        vh = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+        if vw <= 0 or vh <= 0:
+            vx, vy = 0, 0
+            vw = user32.GetSystemMetrics(0)
+            vh = user32.GetSystemMetrics(1)
+
+        user32.SetWindowPos(
+            hwnd,
+            ctypes.c_void_p(-1),  # HWND_TOPMOST
+            vx, vy, vw, vh,
+            0x0020 | 0x0040  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
+        )
+        user32.UpdateWindow(hwnd)
+    except Exception:
+        pass
+
+
+
 class EyeGuardApp:
     VERSION = "2.1.1"
 
@@ -403,55 +454,6 @@ class EyeGuardApp:
             except Exception:
                 pass
 
-
-def force_foreground_window(hwnd: int):
-    """
-    Guarantees window is brought to absolute foreground on top of all other windows,
-    bypassing Windows Foreground Lock Timeout via AttachThreadInput.
-    """
-    if not hwnd or not user32.IsWindow(hwnd):
-        return
-    try:
-        if user32.IsIconic(hwnd):
-            user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        else:
-            user32.ShowWindow(hwnd, 5)  # SW_SHOW
-
-        fg_hwnd = user32.GetForegroundWindow()
-        if fg_hwnd and fg_hwnd != hwnd:
-            fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
-            cur_tid = kernel32.GetCurrentThreadId()
-            if fg_tid and cur_tid and fg_tid != cur_tid:
-                user32.AttachThreadInput(cur_tid, fg_tid, True)
-                user32.BringWindowToTop(hwnd)
-                user32.SetForegroundWindow(hwnd)
-                user32.AttachThreadInput(cur_tid, fg_tid, False)
-            else:
-                user32.BringWindowToTop(hwnd)
-                user32.SetForegroundWindow(hwnd)
-        else:
-            user32.BringWindowToTop(hwnd)
-            user32.SetForegroundWindow(hwnd)
-
-        # Multi-monitor bounds
-        vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
-        vy = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
-        vw = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
-        vh = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
-        if vw <= 0 or vh <= 0:
-            vx, vy = 0, 0
-            vw = user32.GetSystemMetrics(0)
-            vh = user32.GetSystemMetrics(1)
-
-        user32.SetWindowPos(
-            hwnd,
-            ctypes.c_void_p(-1),  # HWND_TOPMOST
-            vx, vy, vw, vh,
-            0x0020 | 0x0040  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
-        )
-        user32.UpdateWindow(hwnd)
-    except Exception:
-        pass
 
     def _enter_fullscreen_kiosk_mode(self, transparency_pct: int = 100):
         hwnd = self._get_main_hwnd()
