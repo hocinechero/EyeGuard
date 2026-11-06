@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/hocinechero/EyeGuard/releases"><img src="https://img.shields.io/badge/Release-v2.1.1-14b8a6?style=for-the-badge&logo=github" alt="Release v2.1.1"></a>
+  <a href="https://github.com/microsoft/winget-pkgs/pull/471894"><img src="https://img.shields.io/badge/Winget-hocinechero.EyeGuard-0078d4?style=for-the-badge&logo=windows-terminal&logoColor=white" alt="Winget Available"></a>
   <a href="https://github.com/hocinechero/EyeGuard"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0ea5e9?style=for-the-badge&logo=windows" alt="Windows 10 / 11"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-teal?style=for-the-badge" alt="MIT License"></a>
   <a href="https://github.com/hocinechero/EyeGuard"><img src="https://img.shields.io/badge/Telemetry-Zero%20Network%20Calls-blueviolet?style=for-the-badge" alt="Zero Telemetry"></a>
@@ -24,12 +25,18 @@
 
 <div align="center">
 
-### 🚀 Instant Downloads (Version 2.1.1)
+### 🚀 Instant Downloads & Installation (Version 2.1.1)
+
+```powershell
+# 1-Command Install via Windows Package Manager
+winget install hocinechero.EyeGuard
+```
 
 | Package | Description | Direct Download |
 | :--- | :--- | :---: |
 | ⚡ **EyeGuard Portable** | **No installation required.** Single standalone executable. Run from desktop or USB drive. | [📥 **Download EyeGuard_Portable.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v2.1.1/EyeGuard_Portable.exe) |
 | 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v2.1.1/EyeGuard_Setup.exe) |
+| 🪟 **Winget Package** | Official Windows Package Manager distribution. Automatically tracked and updated. | `winget install hocinechero.EyeGuard` |
 
 </div>
 
