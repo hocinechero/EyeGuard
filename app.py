@@ -1253,6 +1253,9 @@ def force_foreground_window(hwnd: int):
         clean_mode = str(mode or "normal").lower().strip()
         if clean_mode in ("day", "standard"):
             clean_mode = "normal"
+        if clean_mode != "normal" and self.circadian_active:
+            self.circadian_active = False
+            self.config_mgr.set("circadian", "enabled", False)
         self.active_reading_theme = clean_mode
         self.color_filter_mode = clean_mode
         self.is_gray = (clean_mode == "e_ink")
