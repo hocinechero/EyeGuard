@@ -734,6 +734,12 @@ class EyeGuardApp:
         self.focus_ruler.set_color(str(color_hex))
         self.config_mgr.set("focus_ruler", "color_hex", str(color_hex))
 
+    def set_spotlight_opacity(self, a: float):
+        val = max(0.05, min(0.98, float(a)))
+        res = self.focus_ruler.configure_spotlight(opacity=val)
+        self.config_mgr.set("focus_ruler", "spotlight_opacity", val)
+        return res
+
     def configure_spotlight_focus(self, **kwargs):
         res = self.focus_ruler.configure_spotlight(**kwargs)
         for k, v in kwargs.items():
@@ -1771,6 +1777,9 @@ class JSBridgeApi:
 
     def set_slit_color(self, color_hex):
         self._app.set_slit_color(str(color_hex))
+
+    def set_spotlight_opacity(self, a):
+        return self._app.set_spotlight_opacity(float(a))
 
     def toggle_spotlight(self, enable=None):
         en = bool(enable) if enable is not None else None
