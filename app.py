@@ -1267,6 +1267,7 @@ class EyeGuardApp:
         from core.window_focus import get_running_window_processes
         running = get_running_window_processes()
         return {
+            "success": True,
             "active_theme": self.active_reading_theme,
             "reading_theme": self.active_reading_theme,
             "color_filter_mode": self.active_reading_theme,
@@ -1341,6 +1342,9 @@ class EyeGuardApp:
             "focus_active": self.focus_ruler.is_active,
             "spotlight_active": self.focus_ruler.is_spotlight_active,
             "active_rule_mode": self.magic_engine._active_rule_mode,
+            "reading_theme_scope": self.reading_theme_scope,
+            "reading_theme_target_app": self.reading_theme_target_app,
+            "reading_app_focused": getattr(self.magic_engine, "_reading_app_was_focused", False),
         }
 
     def _setup_hotkeys(self):

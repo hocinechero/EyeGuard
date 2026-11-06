@@ -3679,21 +3679,32 @@
             }
         }
 
-        function toggleHeroSpotlight() {
-            const chk = document.getElementById('chk-spot-enable');
-            if (chk) {
-                chk.checked = !chk.checked;
-                updateSpotlightSettings();
-                updateHeroSpotBtn();
+        async function toggleHeroSpotlight() {
+            if (window.pywebview && window.pywebview.api) {
+                try {
+                    let res = null;
+                    if (window.pywebview.api.toggle_spotlight) {
+                        res = await window.pywebview.api.toggle_spotlight();
+                    } else if (window.pywebview.api.toggle_spotlight_focus) {
+                        res = await window.pywebview.api.toggle_spotlight_focus();
+                    }
+                    if (res && typeof res.spotlight_active === 'boolean') {
+                        updateSpotlightHeroBtn(res.spotlight_active);
+                    }
+                    setTimeout(loadFocusConfig, 50);
+                } catch (e) {
+                    console.error('Failed to toggle spotlight:', e);
+                }
             }
         }
 
-        function updateHeroSpotBtn() {
-            const chk = document.getElementById('chk-spot-enable');
+        function updateSpotlightHeroBtn(isActive) {
             const btn = document.getElementById('btn-hero-spot');
             const txt = document.getElementById('btn-hero-spot-text');
-            if (chk && btn && txt) {
-                if (chk.checked) {
+            const chk = document.getElementById('chk-spot-enable');
+            if (chk) chk.checked = isActive;
+            if (btn && txt) {
+                if (isActive) {
                     btn.classList.add('active');
                     btn.style.borderColor = '#14b8a6';
                     btn.style.background = '#14b8a6';
@@ -3707,6 +3718,13 @@
                     txt.innerText = 'Turn ON (Ctrl+Alt+S)';
                 }
             }
+        }
+
+        function updateHeroSpotBtn() {
+            const btn = document.getElementById('btn-hero-spot');
+            const chk = document.getElementById('chk-spot-enable');
+            const isActive = chk ? chk.checked : (btn ? btn.classList.contains('active') : false);
+            updateSpotlightHeroBtn(isActive);
         }
 
         function handleHeroSpotlightOpacity(val) {
@@ -4189,6 +4207,10 @@
             if (btnApp) btnApp.classList.toggle('active', currentReadingScope === 'app');
             if (boxApp) boxApp.style.display = (currentReadingScope === 'app') ? 'block' : 'none';
 
+            if (currentReadingScope === 'app') {
+                fetchActiveApps();
+            }
+
             if (window.pywebview && window.pywebview.api && window.pywebview.api.set_reading_theme_scope) {
                 try {
                     await window.pywebview.api.set_reading_theme_scope(currentReadingScope, currentTargetApp);
@@ -4212,8 +4234,13 @@
         async function fetchActiveApps() {
             if (!window.pywebview || !window.pywebview.api) return;
             try {
-                const res = await window.pywebview.api.get_running_reader_apps();
-                if (!res || !res.success) return;
+                let res = null;
+                if (window.pywebview.api.get_running_reader_apps) {
+                    res = await window.pywebview.api.get_running_reader_apps();
+                } else if (window.pywebview.api.get_reading_theme_state) {
+                    res = await window.pywebview.api.get_reading_theme_state();
+                }
+                if (!res) return;
 
                 const sel = document.getElementById('select-target-app');
                 if (!sel) return;
@@ -4221,18 +4248,58 @@
                 const currentVal = (sel.value || currentTargetApp || '').toLowerCase();
                 sel.innerHTML = '<option value="">⚡ Select active application...</option>';
 
-                const rawApps = res.running_apps || [];
-                const uniqueApps = Array.from(new Set(rawApps.map(a => String(a || '').trim().toLowerCase()))).filter(a => a.length > 0).sort();
+                // 1. Running Applications (Filtered from system background tasks)
+                const rawApps = res.running_apps || (Array.isArray(res) ? res : []);
+                const SYSTEM_EXCLUDES = new Set([
+                    'explorer.exe', 'eyeguard.exe', 'eyeguard_portable.exe', 'eyeguard_setup.exe',
+                    'python.exe', 'powershell.exe', 'cmd.exe', 'conhost.exe', 'dwm.exe',
+                    'taskhostw.exe', 'sihost.exe', 'svchost.exe', 'services.exe', 'winlogon.exe',
+                    'csrss.exe', 'smss.exe', 'system', 'registry', 'smartscreen.exe', 'dllhost.exe',
+                    'runtimebroker.exe', 'fontdrvhost.exe', 'spoolsv.exe', 'lsass.exe', 'ctfmon.exe'
+                ]);
 
-                if (uniqueApps.length > 0) {
-                    uniqueApps.forEach(exe => {
+                const uniqueRunning = Array.from(new Set(rawApps.map(a => String(a || '').trim().toLowerCase())))
+                    .filter(a => a.length > 0 && !SYSTEM_EXCLUDES.has(a))
+                    .sort();
+
+                if (uniqueRunning.length > 0) {
+                    const grpRunning = document.createElement('optgroup');
+                    grpRunning.label = `🟢 Currently Running Apps (${uniqueRunning.length})`;
+                    uniqueRunning.forEach(exe => {
                         const opt = document.createElement('option');
                         opt.value = exe;
                         opt.innerText = exe;
                         if (exe === currentVal) opt.selected = true;
-                        sel.appendChild(opt);
+                        grpRunning.appendChild(opt);
                     });
+                    sel.appendChild(grpRunning);
                 }
+
+                // 2. Common Document Readers & Browsers
+                const COMMON_READERS = [
+                    { name: "Adobe Acrobat Reader", exe: "acrobat.exe" },
+                    { name: "Foxit PDF Reader", exe: "foxitreader.exe" },
+                    { name: "Google Chrome", exe: "chrome.exe" },
+                    { name: "Microsoft Edge", exe: "msedge.exe" },
+                    { name: "Brave Browser", exe: "brave.exe" },
+                    { name: "Mozilla Firefox", exe: "firefox.exe" },
+                    { name: "Microsoft Word", exe: "winword.exe" },
+                    { name: "Visual Studio Code", exe: "code.exe" },
+                    { name: "Windows Notepad", exe: "notepad.exe" },
+                    { name: "Obsidian", exe: "obsidian.exe" }
+                ];
+
+                const grpCommon = document.createElement('optgroup');
+                grpCommon.label = "📚 Common Document Readers & Browsers";
+                COMMON_READERS.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.exe;
+                    opt.innerText = `${item.name} (${item.exe})`;
+                    if (item.exe === currentVal && !sel.value) opt.selected = true;
+                    grpCommon.appendChild(opt);
+                });
+                sel.appendChild(grpCommon);
+
             } catch (e) {
                 console.error('Failed to fetch running reader apps:', e);
             }
@@ -4815,8 +4882,10 @@
             const opPct = slOp ? parseInt(slOp.value) : 60;
             if (vOp) vOp.innerText = `${opPct}%`;
 
+            const btnHeroSpot = document.getElementById('btn-hero-spot');
+            const isSpotOn = btnHeroSpot ? btnHeroSpot.classList.contains('active') : false;
             const payload = {
-                enabled: chkEnable ? chkEnable.checked : false,
+                enabled: chkEnable ? chkEnable.checked : isSpotOn,
                 include_taskbar: chkTaskbar ? chkTaskbar.checked : false,
                 enable_anim: chkAnim ? chkAnim.checked : true,
                 anim_ms: animMs,
@@ -5868,23 +5937,20 @@
                             updateRulerHeroBtn(st.reading_active);
                         }
                         if (typeof st.spotlight_active === 'boolean') {
-                            const btnSpot = document.getElementById('btn-hero-spot');
-                            const txtSpot = document.getElementById('btn-hero-spot-text');
-                            const chkSpot = document.getElementById('chk-spot-enable');
-                            if (chkSpot) chkSpot.checked = st.spotlight_active;
-                            if (btnSpot && txtSpot) {
-                                if (st.spotlight_active) {
-                                    btnSpot.classList.add('active');
-                                    btnSpot.style.background = '#14b8a6';
-                                    btnSpot.style.borderColor = '#14b8a6';
-                                    btnSpot.style.color = '#ffffff';
-                                    txtSpot.innerText = 'Active (ON)';
+                            updateSpotlightHeroBtn(st.spotlight_active);
+                        }
+
+                        if (st.reading_theme_scope === 'app' && st.reading_theme_target_app) {
+                            const badge = document.getElementById('badge-app-status');
+                            if (badge) {
+                                if (st.reading_app_focused) {
+                                    badge.innerText = `Active & Focused (${st.reading_theme_target_app})`;
+                                    badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                                    badge.style.color = '#10b981';
                                 } else {
-                                    btnSpot.classList.remove('active');
-                                    btnSpot.style.background = '';
-                                    btnSpot.style.borderColor = '';
-                                    btnSpot.style.color = '';
-                                    txtSpot.innerText = 'Turn ON (Ctrl+Alt+S)';
+                                    badge.innerText = `Waiting for focus (${st.reading_theme_target_app})...`;
+                                    badge.style.background = 'rgba(245, 158, 11, 0.2)';
+                                    badge.style.color = '#fbbf24';
                                 }
                             }
                         }
