@@ -413,12 +413,12 @@ class DesktopOverlayManager:
         self.toast_expire_ts = 0.0
         self.toast_position = "bottom_right"  # 'top_center' | 'bottom_right'
         self.toast_title = "TEAR FILM HYDRATION"
-        self.toast_subtitle = "Blink gently twice to replenish tear film & relax focus"
+        self.toast_subtitle = "Blink gently twice"
         self.toast_start_ts = 0.0
         self.toast_duration = 4.0
         self.toast_x = 0
         self.toast_y = 0
-        self.toast_w = 490
+        self.toast_w = 430
         self.toast_h = 60
         self._toast_hdc_mem = None
         self._toast_hbm = None
@@ -996,7 +996,7 @@ class DesktopOverlayManager:
             WS_POPUP,
             100,
             100,
-            490,
+            430,
             60,
             None,
             None,
@@ -1114,7 +1114,7 @@ class DesktopOverlayManager:
             if not self.hwnd_toast:
                 return
             wa = self._get_work_area()
-            w, h = 490, 60
+            w, h = 430, 60
             if self.toast_position == "top_center":
                 x = wa.left + ((wa.right - wa.left) - w) // 2
                 y = wa.top + 28
