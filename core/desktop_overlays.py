@@ -115,8 +115,6 @@ user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
 user32.DefWindowProcW.restype = LRESULT
 user32.RegisterClassExW.argtypes = [ctypes.c_void_p]
 user32.RegisterClassExW.restype = wintypes.ATOM
-user32.FrameRect.argtypes = [wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH]
-user32.FrameRect.restype = ctypes.c_int
 
 gdi32.CreateRoundRectRgn.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 gdi32.CreateRoundRectRgn.restype = wintypes.HRGN
@@ -133,6 +131,79 @@ gdi32.Arc.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int, ctypes.c_int, ct
 gdi32.Arc.restype = wintypes.BOOL
 gdi32.GetStockObject.argtypes = [ctypes.c_int]
 gdi32.GetStockObject.restype = wintypes.HGDIOBJ
+
+gdiplus = ctypes.windll.gdiplus
+
+
+class GdiplusStartupInput(ctypes.Structure):
+    _fields_ = [
+        ("GdiplusVersion", ctypes.c_uint32),
+        ("DebugEventCallback", ctypes.c_void_p),
+        ("SuppressBackgroundThread", ctypes.c_bool),
+        ("SuppressExternalCodecs", ctypes.c_bool),
+    ]
+
+
+class RectF(ctypes.Structure):
+    _fields_ = [
+        ("X", ctypes.c_float),
+        ("Y", ctypes.c_float),
+        ("Width", ctypes.c_float),
+        ("Height", ctypes.c_float),
+    ]
+
+
+class BLENDFUNCTION(ctypes.Structure):
+    _fields_ = [
+        ("BlendOp", ctypes.c_byte),
+        ("BlendFlags", ctypes.c_byte),
+        ("SourceConstantAlpha", ctypes.c_byte),
+        ("AlphaFormat", ctypes.c_byte),
+    ]
+
+
+class BITMAPINFOHEADER(ctypes.Structure):
+    _fields_ = [
+        ("biSize", wintypes.DWORD),
+        ("biWidth", wintypes.LONG),
+        ("biHeight", wintypes.LONG),
+        ("biPlanes", wintypes.WORD),
+        ("biBitCount", wintypes.WORD),
+        ("biCompression", wintypes.DWORD),
+        ("biSizeImage", wintypes.DWORD),
+        ("biXPelsPerMeter", wintypes.LONG),
+        ("biYPelsPerMeter", wintypes.LONG),
+        ("biClrUsed", wintypes.DWORD),
+        ("biClrImportant", wintypes.DWORD),
+    ]
+
+
+class BITMAPINFO(ctypes.Structure):
+    _fields_ = [("bmiHeader", BITMAPINFOHEADER), ("bmiColors", wintypes.DWORD * 3)]
+
+
+user32.UpdateLayeredWindow.argtypes = [
+    wintypes.HWND,
+    wintypes.HDC,
+    ctypes.POINTER(wintypes.POINT),
+    ctypes.POINTER(wintypes.SIZE),
+    wintypes.HDC,
+    ctypes.POINTER(wintypes.POINT),
+    wintypes.COLORREF,
+    ctypes.POINTER(BLENDFUNCTION),
+    wintypes.DWORD,
+]
+user32.UpdateLayeredWindow.restype = wintypes.BOOL
+
+gdi32.CreateDIBSection.argtypes = [
+    wintypes.HDC,
+    ctypes.POINTER(BITMAPINFO),
+    wintypes.UINT,
+    ctypes.POINTER(ctypes.c_void_p),
+    wintypes.HANDLE,
+    wintypes.DWORD,
+]
+gdi32.CreateDIBSection.restype = wintypes.HBITMAP
 
 
 def hex_to_colorref(hex_str: str) -> int:
@@ -328,7 +399,22 @@ class DesktopOverlayManager:
         self.toast_expire_ts = 0.0
         self.toast_position = "bottom_right"  # 'top_center' | 'bottom_right'
         self.toast_title = "Blink Reminder — Rest Your Eyes"
-        self.toast_subtitle = "Relax your ocular muscles with a slow, complete blink."
+        self.toast_subtitle = "Blink gently now to refresh your tear film and relax focus."
+        self.toast_start_ts = 0.0
+        self.toast_duration = 4.0
+        self.toast_x = 0
+        self.toast_y = 0
+        self.toast_w = 430
+        self.toast_h = 54
+        self._toast_hdc_mem = None
+        self._toast_hbm = None
+        self._toast_p_bits = None
+        self._gdiplus_token = ctypes.c_ulong()
+        startup_in = GdiplusStartupInput(1, None, False, False)
+        try:
+            gdiplus.GdiplusStartup(ctypes.byref(self._gdiplus_token), ctypes.byref(startup_in), None)
+        except Exception:
+            pass
 
         # Magic Toolbar state
         self.toolbar_enabled = False
@@ -362,6 +448,12 @@ class DesktopOverlayManager:
 
     def stop(self) -> None:
         self._stop_event.set()
+        if hasattr(self, "_gdiplus_token") and self._gdiplus_token.value:
+            try:
+                gdiplus.GdiplusShutdown(self._gdiplus_token)
+                self._gdiplus_token = ctypes.c_ulong(0)
+            except Exception:
+                pass
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=1.5)
 
@@ -401,7 +493,9 @@ class DesktopOverlayManager:
         self.toast_title = title
         self.toast_subtitle = subtitle
         self.toast_position = "top_center" if position == "top_center" else "bottom_right"
-        self.toast_expire_ts = time.monotonic() + max(1.0, float(duration_sec))
+        self.toast_start_ts = time.monotonic()
+        self.toast_duration = max(1.0, float(duration_sec))
+        self.toast_expire_ts = self.toast_start_ts + self.toast_duration
         self.toast_visible = True
         self._cmd_queue.put(("show_toast",))
 
@@ -450,7 +544,9 @@ class DesktopOverlayManager:
 
         elif hwnd == self.hwnd_toast:
             if msg == WM_PAINT:
-                self._paint_toast_window(hwnd)
+                ps = PAINTSTRUCT()
+                user32.BeginPaint(hwnd, ctypes.byref(ps))
+                user32.EndPaint(hwnd, ctypes.byref(ps))
                 return 0
 
         elif hwnd == self.hwnd_toolbar:
@@ -542,74 +638,236 @@ class DesktopOverlayManager:
         finally:
             user32.EndPaint(hwnd, ctypes.byref(ps))
 
-    def _paint_toast_window(self, hwnd: int) -> None:
-        ps = PAINTSTRUCT()
-        hdc = user32.BeginPaint(hwnd, ctypes.byref(ps))
-        if not hdc:
+    def _render_and_update_toast(self, progress: float = 1.0) -> None:
+        if not self.hwnd_toast:
             return
+        w = self.toast_w
+        h = self.toast_h
+
+        # Lazily allocate 32-bit DIB and memory DC
+        if not self._toast_hdc_mem or not self._toast_hbm or not self._toast_p_bits:
+            bmi = BITMAPINFO()
+            bmi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+            bmi.bmiHeader.biWidth = w
+            bmi.bmiHeader.biHeight = -h  # top-down DIB
+            bmi.bmiHeader.biPlanes = 1
+            bmi.bmiHeader.biBitCount = 32
+            bmi.bmiHeader.biCompression = 0
+
+            self._toast_p_bits = ctypes.c_void_p()
+            hdc_screen = user32.GetDC(None)
+            self._toast_hdc_mem = gdi32.CreateCompatibleDC(hdc_screen)
+            self._toast_hbm = gdi32.CreateDIBSection(
+                self._toast_hdc_mem,
+                ctypes.byref(bmi),
+                0,
+                ctypes.byref(self._toast_p_bits),
+                None,
+                0,
+            )
+            gdi32.SelectObject(self._toast_hdc_mem, self._toast_hbm)
+            user32.ReleaseDC(None, hdc_screen)
+
+        ctypes.memset(self._toast_p_bits, 0, w * h * 4)
+
+        graphics = ctypes.c_void_p()
+        gdiplus.GdipCreateFromHDC(self._toast_hdc_mem, ctypes.byref(graphics))
+        gdiplus.GdipSetSmoothingMode(graphics, 2)  # AntiAlias
+        gdiplus.GdipSetTextRenderingHint(graphics, 4)  # AntiAliasGridFit
+
         try:
-            rc = wintypes.RECT()
-            user32.GetClientRect(hwnd, ctypes.byref(rc))
-            w = max(1, rc.right - rc.left)
-            h = max(1, rc.bottom - rc.top)
-
-            # 1. Dark Sleek Card Background (#0f141c / BGR: 0x001C140F)
-            bg_brush = gdi32.CreateSolidBrush(0x001C140F)
-            user32.FillRect(hdc, ctypes.byref(rc), bg_brush)
-            gdi32.DeleteObject(bg_brush)
-
-            # 2. Subtle Card Border (1px border #1e293b / BGR: 0x003B291E)
-            border_rc = wintypes.RECT(0, 0, w, h)
-            border_brush = gdi32.CreateSolidBrush(0x003B291E)
-            user32.FrameRect(hdc, ctypes.byref(border_rc), border_brush)
-            gdi32.DeleteObject(border_brush)
-
-            # 3. Top Accent Bar (3px cyan-blue / #0ea5e9, BGR: 0x00E9A50E)
-            top_rc = wintypes.RECT(0, 0, w, 3)
-            accent_brush = gdi32.CreateSolidBrush(0x00E9A50E)
-            user32.FillRect(hdc, ctypes.byref(top_rc), accent_brush)
-            gdi32.DeleteObject(accent_brush)
-
-            # 4. Text Hierarchy (Centered Segoe UI typography)
-            gdi32.SetBkMode(hdc, TRANSPARENT)
-
-            # Title with leading bullet indicator
-            title_text = self.toast_title
-            if not title_text.startswith("●"):
-                title_text = f"●  {title_text}"
-
-            # Upper Title Line (#0ea5e9 Vibrant Sky Blue, BGR: 0x00E9A50E)
-            gdi32.SetTextColor(hdc, 0x00E9A50E)
-            f_title = gdi32.CreateFontW(-15, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
-            old_f = gdi32.SelectObject(hdc, f_title)
-            r1 = wintypes.RECT(12, 8, w - 12, 30)
-            user32.DrawTextW(
-                hdc,
-                title_text,
-                -1,
-                ctypes.byref(r1),
-                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+            # Check RTL
+            is_rtl = any(
+                "\u0600" <= c <= "\u06ff"
+                for c in f"{self.toast_title} {self.toast_subtitle}"
             )
-            gdi32.SelectObject(hdc, old_f)
-            gdi32.DeleteObject(f_title)
 
-            # Lower Subtitle Line (#e2e8f0 Crisp Off-White, BGR: 0x00F0E8E2)
-            gdi32.SetTextColor(hdc, 0x00F0E8E2)
-            f_sub = gdi32.CreateFontW(-13, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
-            old_f2 = gdi32.SelectObject(hdc, f_sub)
-            r2 = wintypes.RECT(12, 31, w - 12, h - 5)
-            user32.DrawTextW(
-                hdc,
-                self.toast_subtitle,
-                -1,
-                ctypes.byref(r2),
-                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-            )
-            gdi32.SelectObject(hdc, old_f2)
-            gdi32.DeleteObject(f_sub)
+            # 1. Pill Capsule Shape
+            path = ctypes.c_void_p()
+            gdiplus.GdipCreatePath(0, ctypes.byref(path))
+            d = float(h - 1)
+            gdiplus.GdipAddPathArc(path, ctypes.c_float(0.5), ctypes.c_float(0.5), ctypes.c_float(d), ctypes.c_float(d), ctypes.c_float(90), ctypes.c_float(180))
+            gdiplus.GdipAddPathLine(path, ctypes.c_float(d / 2), ctypes.c_float(0.5), ctypes.c_float(w - 1 - d / 2), ctypes.c_float(0.5))
+            gdiplus.GdipAddPathArc(path, ctypes.c_float(w - 1 - d), ctypes.c_float(0.5), ctypes.c_float(d), ctypes.c_float(d), ctypes.c_float(270), ctypes.c_float(180))
+            gdiplus.GdipAddPathLine(path, ctypes.c_float(w - 1 - d / 2), ctypes.c_float(d), ctypes.c_float(d / 2), ctypes.c_float(d))
+            gdiplus.GdipClosePathFigure(path)
+
+            # Translucent Obsidian Glass (#0D141C / 95% opacity)
+            bg_brush = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xF20D141C), ctypes.byref(bg_brush))
+            gdiplus.GdipFillPath(graphics, bg_brush, path)
+            gdiplus.GdipDeleteBrush(bg_brush)
+
+            # Glowing subtle teal rim border (1.2px)
+            rim_pen = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(ctypes.c_uint32(0x602DD4BF), ctypes.c_float(1.2), 2, ctypes.byref(rim_pen))
+            gdiplus.GdipDrawPath(graphics, rim_pen, path)
+            gdiplus.GdipDeletePen(rim_pen)
+            gdiplus.GdipDeletePath(path)
+
+            # 2. Glowing Orb Badge with Eyelid Vector
+            if is_rtl:
+                cx = float(w - 28.0)
+                dx = cx - 10.5
+            else:
+                cx = 28.0
+                dx = cx + 10.5
+            cy = float(h / 2)
+            orb_r = 16.0
+            dy = cy + 10.5
+
+            # Orb Halo
+            halo = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x2514B8A6), ctypes.byref(halo))
+            gdiplus.GdipFillEllipse(graphics, halo, ctypes.c_float(cx - orb_r - 2), ctypes.c_float(cy - orb_r - 2), ctypes.c_float((orb_r + 2) * 2), ctypes.c_float((orb_r + 2) * 2))
+            gdiplus.GdipDeleteBrush(halo)
+
+            # Orb Body
+            orb_body = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x4014B8A6), ctypes.byref(orb_body))
+            gdiplus.GdipFillEllipse(graphics, orb_body, ctypes.c_float(cx - orb_r), ctypes.c_float(cy - orb_r), ctypes.c_float(orb_r * 2), ctypes.c_float(orb_r * 2))
+            gdiplus.GdipDeleteBrush(orb_body)
+
+            # Orb Rim
+            orb_pen = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(ctypes.c_uint32(0x802DD4BF), ctypes.c_float(1.2), 2, ctypes.byref(orb_pen))
+            gdiplus.GdipDrawEllipse(graphics, orb_pen, ctypes.c_float(cx - orb_r), ctypes.c_float(cy - orb_r), ctypes.c_float(orb_r * 2), ctypes.c_float(orb_r * 2))
+            gdiplus.GdipDeletePen(orb_pen)
+
+            # Smooth Vector Eyelid Contours (cubic beziers)
+            eye_path = ctypes.c_void_p()
+            gdiplus.GdipCreatePath(0, ctypes.byref(eye_path))
+            gdiplus.GdipAddPathBezier(eye_path, ctypes.c_float(cx - 9.5), ctypes.c_float(cy), ctypes.c_float(cx - 4.5), ctypes.c_float(cy - 7.0), ctypes.c_float(cx + 4.5), ctypes.c_float(cy - 7.0), ctypes.c_float(cx + 9.5), ctypes.c_float(cy))
+            gdiplus.GdipAddPathBezier(eye_path, ctypes.c_float(cx + 9.5), ctypes.c_float(cy), ctypes.c_float(cx + 4.5), ctypes.c_float(cy + 7.0), ctypes.c_float(cx - 4.5), ctypes.c_float(cy + 7.0), ctypes.c_float(cx - 9.5), ctypes.c_float(cy))
+            gdiplus.GdipClosePathFigure(eye_path)
+
+            eye_pen = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(ctypes.c_uint32(0xFF2DD4BF), ctypes.c_float(1.8), 2, ctypes.byref(eye_pen))
+            gdiplus.GdipDrawPath(graphics, eye_pen, eye_path)
+            gdiplus.GdipDeletePen(eye_pen)
+            gdiplus.GdipDeletePath(eye_path)
+
+            # Filled Pupil
+            pupil = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(pupil))
+            gdiplus.GdipFillEllipse(graphics, pupil, ctypes.c_float(cx - 3.0), ctypes.c_float(cy - 3.0), ctypes.c_float(6.0), ctypes.c_float(6.0))
+            gdiplus.GdipDeleteBrush(pupil)
+
+            # Corneal Glint
+            glint = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFFFFFFFF), ctypes.byref(glint))
+            gdiplus.GdipFillEllipse(graphics, glint, ctypes.c_float(cx + 0.5), ctypes.c_float(cy - 2.5), ctypes.c_float(1.8), ctypes.c_float(1.8))
+            gdiplus.GdipDeleteBrush(glint)
+
+            # Glowing Droplet Indicator on Orb Corner
+            d_halo = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x552DD4BF), ctypes.byref(d_halo))
+            gdiplus.GdipFillEllipse(graphics, d_halo, ctypes.c_float(dx - 5.0), ctypes.c_float(dy - 5.0), ctypes.c_float(10.0), ctypes.c_float(10.0))
+            gdiplus.GdipDeleteBrush(d_halo)
+
+            d_dark = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF0D141C), ctypes.byref(d_dark))
+            gdiplus.GdipFillEllipse(graphics, d_dark, ctypes.c_float(dx - 4.0), ctypes.c_float(dy - 4.0), ctypes.c_float(8.0), ctypes.c_float(8.0))
+            gdiplus.GdipDeleteBrush(d_dark)
+
+            d_core = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(d_core))
+            gdiplus.GdipFillEllipse(graphics, d_core, ctypes.c_float(dx - 2.2), ctypes.c_float(dy - 2.2), ctypes.c_float(4.4), ctypes.c_float(4.4))
+            gdiplus.GdipDeleteBrush(d_core)
+
+            # 3. Typography & Hierarchy
+            ff = ctypes.c_void_p()
+            gdiplus.GdipCreateFontFamilyFromName("Segoe UI", None, ctypes.byref(ff))
+            f_tag = ctypes.c_void_p()
+            gdiplus.GdipCreateFont(ff, ctypes.c_float(8.5), 1, 3, ctypes.byref(f_tag))  # Bold
+            f_sub = ctypes.c_void_p()
+            gdiplus.GdipCreateFont(ff, ctypes.c_float(9.5), 0, 3, ctypes.byref(f_sub))  # Regular
+
+            clean_title = self.toast_title.lstrip("●•-— ").strip() or "TEAR FILM HYDRATION"
+            clean_sub = self.toast_subtitle.strip()
+
+            # Leading bullet dot for tag
+            tag_dot = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(tag_dot))
+            if is_rtl:
+                gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(w - 56.0), ctypes.c_float(12.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
+            else:
+                gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(54.0), ctypes.c_float(12.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
+            gdiplus.GdipDeleteBrush(tag_dot)
+
+            tag_b = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(tag_b))
+            sub_b = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFFF1F5F9), ctypes.byref(sub_b))
+
+            str_format = ctypes.c_void_p()
+            gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(str_format))
+            if is_rtl:
+                gdiplus.GdipSetStringFormatFlags(str_format, 0x00000001)  # RTL
+                tag_rect = RectF(50.0, 7.5, float(w - 114), 16.0)
+                sub_rect = RectF(50.0, 25.5, float(w - 95), 22.0)
+            else:
+                tag_rect = RectF(64.0, 7.5, float(w - 115), 16.0)
+                sub_rect = RectF(54.0, 25.5, float(w - 100), 22.0)
+
+            gdiplus.GdipDrawString(graphics, clean_title, -1, f_tag, ctypes.byref(tag_rect), str_format, tag_b)
+            gdiplus.GdipDrawString(graphics, clean_sub, -1, f_sub, ctypes.byref(sub_rect), str_format, sub_b)
+
+            gdiplus.GdipDeleteStringFormat(str_format)
+            gdiplus.GdipDeleteBrush(tag_b)
+            gdiplus.GdipDeleteBrush(sub_b)
+            gdiplus.GdipDeleteFont(f_tag)
+            gdiplus.GdipDeleteFont(f_sub)
+            gdiplus.GdipDeleteFontFamily(ff)
+
+            # 4. Circular Progress Ring & Close Cross
+            if is_rtl:
+                rx, ry = 38.0, float(h / 2)
+                cx_x, cy_x = 18.0, float(h / 2)
+            else:
+                rx, ry = float(w - 38), float(h / 2)
+                cx_x, cy_x = float(w - 18), float(h / 2)
+
+            p_track = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(ctypes.c_uint32(0x35FFFFFF), ctypes.c_float(1.8), 2, ctypes.byref(p_track))
+            gdiplus.GdipDrawEllipse(graphics, p_track, ctypes.c_float(rx - 7.5), ctypes.c_float(ry - 7.5), ctypes.c_float(15), ctypes.c_float(15))
+            gdiplus.GdipDeletePen(p_track)
+
+            if progress > 0.01:
+                p_prog = ctypes.c_void_p()
+                gdiplus.GdipCreatePen1(ctypes.c_uint32(0xFF2DD4BF), ctypes.c_float(1.8), 2, ctypes.byref(p_prog))
+                sweep = ctypes.c_float(360.0 * progress)
+                gdiplus.GdipDrawArc(graphics, p_prog, ctypes.c_float(rx - 7.5), ctypes.c_float(ry - 7.5), ctypes.c_float(15), ctypes.c_float(15), ctypes.c_float(-90), sweep)
+                gdiplus.GdipDeletePen(p_prog)
+
+            x_p = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(ctypes.c_uint32(0x8094A3B8), ctypes.c_float(1.6), 2, ctypes.byref(x_p))
+            gdiplus.GdipDrawLine(graphics, x_p, ctypes.c_float(cx_x - 3.5), ctypes.c_float(cy_x - 3.5), ctypes.c_float(cx_x + 3.5), ctypes.c_float(cy_x + 3.5))
+            gdiplus.GdipDrawLine(graphics, x_p, ctypes.c_float(cx_x + 3.5), ctypes.c_float(cy_x - 3.5), ctypes.c_float(cx_x - 3.5), ctypes.c_float(cy_x + 3.5))
+            gdiplus.GdipDeletePen(x_p)
 
         finally:
-            user32.EndPaint(hwnd, ctypes.byref(ps))
+            gdiplus.GdipDeleteGraphics(graphics)
+
+        blend = BLENDFUNCTION(0, 0, 255, 1)
+        pt_src = wintypes.POINT(0, 0)
+        pt_dest = wintypes.POINT(self.toast_x, self.toast_y)
+        size_dest = wintypes.SIZE(w, h)
+        hdc_screen = user32.GetDC(None)
+
+        user32.UpdateLayeredWindow(
+            self.hwnd_toast,
+            hdc_screen,
+            ctypes.byref(pt_dest),
+            ctypes.byref(size_dest),
+            self._toast_hdc_mem,
+            ctypes.byref(pt_src),
+            0,
+            ctypes.byref(blend),
+            2,  # ULW_ALPHA
+        )
+        user32.ReleaseDC(None, hdc_screen)
+        user32.ShowWindow(self.hwnd_toast, 4)  # SW_SHOWNOACTIVATE
 
     def _paint_toolbar_window(self, hwnd: int) -> None:
         ps = PAINTSTRUCT()
@@ -703,15 +961,13 @@ class DesktopOverlayManager:
             WS_POPUP,
             100,
             100,
-            340,
-            64,
+            430,
+            54,
             None,
             None,
             hinst,
             None,
         )
-        if self.hwnd_toast:
-            user32.SetLayeredWindowAttributes(self.hwnd_toast, 0, 240, LWA_ALPHA)
 
         # 3. Create Floating Magic Toolbar Window (hidden initially)
         self.hwnd_toolbar = user32.CreateWindowExW(
@@ -748,11 +1004,16 @@ class DesktopOverlayManager:
 
             now = time.monotonic()
 
-            # Check toast expiration
-            if self.toast_visible and now >= self.toast_expire_ts:
-                self.toast_visible = False
-                if self.hwnd_toast:
-                    user32.ShowWindow(self.hwnd_toast, SW_HIDE)
+            # Check toast expiration and progress animation
+            if self.toast_visible:
+                if now >= self.toast_expire_ts:
+                    self.toast_visible = False
+                    if self.hwnd_toast:
+                        user32.ShowWindow(self.hwnd_toast, SW_HIDE)
+                else:
+                    elapsed = now - self.toast_start_ts
+                    progress = max(0.0, min(1.0, 1.0 - (elapsed / self.toast_duration)))
+                    self._render_and_update_toast(progress=progress)
 
             # Update mini window hover translucency
             if self.mini_enabled and self.hwnd_mini:
@@ -763,6 +1024,14 @@ class DesktopOverlayManager:
                 self._step_magic_toolbar(now)
 
             time.sleep(0.04)
+
+        # Cleanup toast DIB and memory DC
+        if self._toast_hbm:
+            gdi32.DeleteObject(self._toast_hbm)
+            self._toast_hbm = None
+        if self._toast_hdc_mem:
+            gdi32.DeleteDC(self._toast_hdc_mem)
+            self._toast_hdc_mem = None
 
         # Cleanup HWNDs
         for h in (self.hwnd_mini, self.hwnd_toast, self.hwnd_toolbar):
@@ -810,24 +1079,18 @@ class DesktopOverlayManager:
             if not self.hwnd_toast:
                 return
             wa = self._get_work_area()
-            w, h = 430, 58
+            w, h = 430, 54
             if self.toast_position == "top_center":
                 x = wa.left + ((wa.right - wa.left) - w) // 2
                 y = wa.top + 28
             else:
                 x = wa.right - w - 24
                 y = wa.bottom - h - 68
-            user32.SetWindowPos(
-                self.hwnd_toast,
-                HWND_TOPMOST,
-                x,
-                y,
-                w,
-                h,
-                SWP_NOACTIVATE | SWP_SHOWWINDOW,
-            )
-            user32.SetWindowRgn(self.hwnd_toast, None, True)
-            user32.InvalidateRect(self.hwnd_toast, None, True)
+            self.toast_x = x
+            self.toast_y = y
+            self.toast_w = w
+            self.toast_h = h
+            self._render_and_update_toast(progress=1.0)
 
         elif op == "hide_toast":
             if self.hwnd_toast:
