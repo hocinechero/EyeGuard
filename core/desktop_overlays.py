@@ -399,7 +399,7 @@ class DesktopOverlayManager:
         self.toast_expire_ts = 0.0
         self.toast_position = "bottom_right"  # 'top_center' | 'bottom_right'
         self.toast_title = "Blink Reminder — Rest Your Eyes"
-        self.toast_subtitle = "Blink gently now to refresh your tear film and relax focus."
+        self.toast_subtitle = "Close eyes gently for 1 sec"
         self.toast_start_ts = 0.0
         self.toast_duration = 4.0
         self.toast_x = 0
@@ -802,13 +802,16 @@ class DesktopOverlayManager:
 
             str_format = ctypes.c_void_p()
             gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(str_format))
+            flags = 0x00001000  # StringFormatFlagsNoWrap
             if is_rtl:
-                gdiplus.GdipSetStringFormatFlags(str_format, 0x00000001)  # RTL
+                flags |= 0x00000001  # DirectionRightToLeft
                 tag_rect = RectF(50.0, 7.5, float(w - 114), 16.0)
                 sub_rect = RectF(50.0, 25.5, float(w - 95), 22.0)
             else:
                 tag_rect = RectF(64.0, 7.5, float(w - 115), 16.0)
                 sub_rect = RectF(54.0, 25.5, float(w - 100), 22.0)
+            gdiplus.GdipSetStringFormatFlags(str_format, flags)
+            gdiplus.GdipSetStringFormatTrimming(str_format, 3)  # StringTrimmingEllipsisWord
 
             gdiplus.GdipDrawString(graphics, clean_title, -1, f_tag, ctypes.byref(tag_rect), str_format, tag_b)
             gdiplus.GdipDrawString(graphics, clean_sub, -1, f_sub, ctypes.byref(sub_rect), str_format, sub_b)
