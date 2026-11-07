@@ -248,6 +248,8 @@ class ConfigManager:
     def get(self, *keys, default=None):
         curr = self.data
         for k in keys:
+            if not isinstance(k, (str, int, float, bool)):
+                return default
             if isinstance(curr, dict) and k in curr:
                 curr = curr[k]
             else:
