@@ -555,11 +555,11 @@ class EyeGuardApp:
             pos = str(tm.get("reminder_popup_pos", "top_center"))
             lang = str(self.config_mgr.get("general", "language", default="en"))
             if lang == "ar":
-                tag = "ترطيب القرنية وتجديد الدموع"
-                msg = "أغمض جفنيك بلطف الآن لدعم الرطوبة وتنشيط التركيز"
+                tag = "تذكير بالرمش — أغمض عينيك بلطف الآن"
+                msg = "أرح عضلات عينيك برمشة بطيئة وكاملة لترطيب سطح العين"
             else:
-                tag = "TEAR FILM HYDRATION"
-                msg = "Blink gently now to refresh your ocular focus"
+                tag = "Blink Reminder — Blink Gently Now"
+                msg = "Relax your ocular muscles with a slow, complete blink."
             self.desktop_overlays.show_toast(
                 title=tag,
                 subtitle=msg,
@@ -568,8 +568,8 @@ class EyeGuardApp:
             )
         except Exception:
             self.desktop_overlays.show_toast(
-                title="TEAR FILM HYDRATION",
-                subtitle="Blink gently now to refresh your ocular focus",
+                title="Blink Reminder — Blink Gently Now",
+                subtitle="Relax your ocular muscles with a slow, complete blink.",
                 position="top_center",
                 duration_sec=4.0,
             )

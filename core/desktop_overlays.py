@@ -115,6 +115,8 @@ user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
 user32.DefWindowProcW.restype = LRESULT
 user32.RegisterClassExW.argtypes = [ctypes.c_void_p]
 user32.RegisterClassExW.restype = wintypes.ATOM
+user32.FrameRect.argtypes = [wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH]
+user32.FrameRect.restype = ctypes.c_int
 
 gdi32.CreateRoundRectRgn.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 gdi32.CreateRoundRectRgn.restype = wintypes.HRGN
@@ -326,7 +328,7 @@ class DesktopOverlayManager:
         self.toast_expire_ts = 0.0
         self.toast_position = "bottom_right"  # 'top_center' | 'bottom_right'
         self.toast_title = "Blink Reminder — Rest Your Eyes"
-        self.toast_subtitle = "Blink gently now to refresh your tear film and relax focus."
+        self.toast_subtitle = "Relax your ocular muscles with a slow, complete blink."
 
         # Magic Toolbar state
         self.toolbar_enabled = False
@@ -551,56 +553,24 @@ class DesktopOverlayManager:
             w = max(1, rc.right - rc.left)
             h = max(1, rc.bottom - rc.top)
 
-            # 1. Dark Luxury Glass Background (#0d1117 / BGR: 0x0017110D)
-            bg_brush = gdi32.CreateSolidBrush(0x0017110D)
+            # 1. Dark Sleek Card Background (#0f141c / BGR: 0x001C140F)
+            bg_brush = gdi32.CreateSolidBrush(0x001C140F)
             user32.FillRect(hdc, ctypes.byref(rc), bg_brush)
             gdi32.DeleteObject(bg_brush)
 
-            # 2. Glowing Subtle Teal Rim Border (32px capsule, subtle 25% opacity)
-            rim_pen = gdi32.CreatePen(0, 1, 0x004E3F18)  # Subtle refined teal rim
-            null_brush = gdi32.GetStockObject(NULL_BRUSH)
-            old_pen = gdi32.SelectObject(hdc, rim_pen)
-            old_brush = gdi32.SelectObject(hdc, null_brush)
-            gdi32.RoundRect(hdc, 0, 0, w, h, 32, 32)
-            gdi32.SelectObject(hdc, old_pen)
-            gdi32.SelectObject(hdc, old_brush)
-            gdi32.DeleteObject(rim_pen)
+            # 2. Subtle Card Border (1px border #1e293b / BGR: 0x003B291E)
+            border_rc = wintypes.RECT(0, 0, w, h)
+            border_brush = gdi32.CreateSolidBrush(0x003B291E)
+            user32.FrameRect(hdc, ctypes.byref(border_rc), border_brush)
+            gdi32.DeleteObject(border_brush)
 
-            # 3. Left Emblem Badge: Stylized Eyelid & Eye in Circular Ring
-            cx, cy = 30, h // 2
-            badge_brush = gdi32.CreateSolidBrush(0x002B2113)  # dark teal/slate base
-            badge_pen = gdi32.CreatePen(0, 1, 0x00BFD42D)  # #2dd4bf teal ring
-            old_pen = gdi32.SelectObject(hdc, badge_pen)
-            old_brush = gdi32.SelectObject(hdc, badge_brush)
-            gdi32.Ellipse(hdc, cx - 14, cy - 14, cx + 14, cy + 14)
-            gdi32.SelectObject(hdc, old_pen)
-            gdi32.SelectObject(hdc, old_brush)
-            gdi32.DeleteObject(badge_brush)
-            gdi32.DeleteObject(badge_pen)
+            # 3. Top Accent Bar (3px cyan-blue / #0ea5e9, BGR: 0x00E9A50E)
+            top_rc = wintypes.RECT(0, 0, w, 3)
+            accent_brush = gdi32.CreateSolidBrush(0x00E9A50E)
+            user32.FillRect(hdc, ctypes.byref(top_rc), accent_brush)
+            gdi32.DeleteObject(accent_brush)
 
-            # Stylized Eye Contour (Smooth eyelid curves + glowing pupil)
-            eye_pen = gdi32.CreatePen(0, 1, 0x00BFD42D)  # #2dd4bf
-            old_pen = gdi32.SelectObject(hdc, eye_pen)
-            gdi32.Arc(hdc, cx - 10, cy - 8, cx + 10, cy + 8, cx + 10, cy, cx - 10, cy)
-            gdi32.Arc(hdc, cx - 10, cy - 8, cx + 10, cy + 8, cx - 10, cy, cx + 10, cy)
-            gdi32.SelectObject(hdc, old_pen)
-            gdi32.DeleteObject(eye_pen)
-
-            # Bright pupil dot & white corneal glint
-            pupil_brush = gdi32.CreateSolidBrush(0x00BFD42D)
-            null_pen = gdi32.GetStockObject(NULL_PEN)
-            old_brush = gdi32.SelectObject(hdc, pupil_brush)
-            old_pen = gdi32.SelectObject(hdc, null_pen)
-            gdi32.Ellipse(hdc, cx - 3, cy - 3, cx + 4, cy + 4)
-            glint_brush = gdi32.CreateSolidBrush(0x00FFFFFF)
-            gdi32.SelectObject(hdc, glint_brush)
-            gdi32.Ellipse(hdc, cx, cy - 2, cx + 2, cy)
-            gdi32.SelectObject(hdc, old_pen)
-            gdi32.SelectObject(hdc, old_brush)
-            gdi32.DeleteObject(pupil_brush)
-            gdi32.DeleteObject(glint_brush)
-
-            # 4. Text Hierarchy
+            # 4. Text Hierarchy (Centered Segoe UI typography)
             gdi32.SetBkMode(hdc, TRANSPARENT)
 
             # Title with leading bullet indicator
@@ -608,56 +578,35 @@ class DesktopOverlayManager:
             if not title_text.startswith("●"):
                 title_text = f"●  {title_text}"
 
-            # Upper Tag (e.g. ● TEAR FILM HYDRATION)
-            gdi32.SetTextColor(hdc, 0x00BFD42D)  # #2dd4bf Teal
-            f_tag = gdi32.CreateFontW(-11, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
-            old_f = gdi32.SelectObject(hdc, f_tag)
-            r1 = wintypes.RECT(54, 9, w - 50, 25)
+            # Upper Title Line (#0ea5e9 Vibrant Sky Blue, BGR: 0x00E9A50E)
+            gdi32.SetTextColor(hdc, 0x00E9A50E)
+            f_title = gdi32.CreateFontW(-15, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
+            old_f = gdi32.SelectObject(hdc, f_title)
+            r1 = wintypes.RECT(12, 8, w - 12, 30)
             user32.DrawTextW(
                 hdc,
                 title_text,
                 -1,
                 ctypes.byref(r1),
-                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
             )
             gdi32.SelectObject(hdc, old_f)
-            gdi32.DeleteObject(f_tag)
+            gdi32.DeleteObject(f_title)
 
-            # Lower Subtitle (Prompt message)
-            gdi32.SetTextColor(hdc, 0x00FCFAF8)  # Crisp off-white #F8FAFC
+            # Lower Subtitle Line (#e2e8f0 Crisp Off-White, BGR: 0x00F0E8E2)
+            gdi32.SetTextColor(hdc, 0x00F0E8E2)
             f_sub = gdi32.CreateFontW(-13, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
             old_f2 = gdi32.SelectObject(hdc, f_sub)
-            r2 = wintypes.RECT(54, 27, w - 50, 49)
+            r2 = wintypes.RECT(12, 31, w - 12, h - 5)
             user32.DrawTextW(
                 hdc,
                 self.toast_subtitle,
                 -1,
                 ctypes.byref(r2),
-                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
             )
             gdi32.SelectObject(hdc, old_f2)
             gdi32.DeleteObject(f_sub)
-
-            # 5. Right-side Circular Progress Ring & Dismiss Indicator
-            cx_r, cy_r = w - 24, h // 2
-            ring_pen = gdi32.CreatePen(0, 1, 0x003F3018)  # subtle ring border
-            null_brush = gdi32.GetStockObject(NULL_BRUSH)
-            old_pen = gdi32.SelectObject(hdc, ring_pen)
-            old_brush = gdi32.SelectObject(hdc, null_brush)
-            gdi32.Ellipse(hdc, cx_r - 9, cy_r - 9, cx_r + 9, cy_r + 9)
-            gdi32.SelectObject(hdc, old_pen)
-            gdi32.SelectObject(hdc, old_brush)
-            gdi32.DeleteObject(ring_pen)
-
-            # Center droplet pulse dot in glowing teal
-            drop_brush = gdi32.CreateSolidBrush(0x00BFD42D)
-            null_pen = gdi32.GetStockObject(NULL_PEN)
-            old_brush = gdi32.SelectObject(hdc, drop_brush)
-            old_pen = gdi32.SelectObject(hdc, null_pen)
-            gdi32.Ellipse(hdc, cx_r - 3, cy_r - 3, cx_r + 4, cy_r + 4)
-            gdi32.SelectObject(hdc, old_pen)
-            gdi32.SelectObject(hdc, old_brush)
-            gdi32.DeleteObject(drop_brush)
 
         finally:
             user32.EndPaint(hwnd, ctypes.byref(ps))
@@ -877,8 +826,7 @@ class DesktopOverlayManager:
                 h,
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
             )
-            hrgn = gdi32.CreateRoundRectRgn(0, 0, w + 1, h + 1, 32, 32)
-            user32.SetWindowRgn(self.hwnd_toast, hrgn, True)
+            user32.SetWindowRgn(self.hwnd_toast, None, True)
             user32.InvalidateRect(self.hwnd_toast, None, True)
 
         elif op == "hide_toast":
