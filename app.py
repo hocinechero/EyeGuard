@@ -556,10 +556,10 @@ class EyeGuardApp:
             lang = str(self.config_mgr.get("general", "language", default="en"))
             if lang == "ar":
                 tag = "ترطيب القرنية وتجديد الدموع"
-                msg = "ارمِش بعينيك بلطف مرتين لترطيب سطح العين"
+                msg = "ارمش مرتين بلطف"
             else:
                 tag = "TEAR FILM HYDRATION"
-                msg = "Blink gently twice to replenish tear film & relax focus"
+                msg = "Blink gently twice"
             self.desktop_overlays.show_toast(
                 title=tag,
                 subtitle=msg,
@@ -569,7 +569,7 @@ class EyeGuardApp:
         except Exception:
             self.desktop_overlays.show_toast(
                 title="TEAR FILM HYDRATION",
-                subtitle="Blink gently twice to replenish tear film & relax focus",
+                subtitle="Blink gently twice",
                 position="top_center",
                 duration_sec=4.0,
             )
