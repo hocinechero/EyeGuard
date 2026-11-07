@@ -194,6 +194,12 @@ user32.UpdateLayeredWindow.argtypes = [
     wintypes.DWORD,
 ]
 user32.UpdateLayeredWindow.restype = wintypes.BOOL
+user32.GetDC.argtypes = [wintypes.HWND]
+user32.GetDC.restype = wintypes.HDC
+user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+user32.ReleaseDC.restype = ctypes.c_int
+gdiplus.GdipCreateFromHDC.argtypes = [wintypes.HDC, ctypes.POINTER(ctypes.c_void_p)]
+gdiplus.GdipCreateFromHDC.restype = ctypes.c_int
 
 gdi32.CreateDIBSection.argtypes = [
     wintypes.HDC,
@@ -204,6 +210,14 @@ gdi32.CreateDIBSection.argtypes = [
     wintypes.DWORD,
 ]
 gdi32.CreateDIBSection.restype = wintypes.HBITMAP
+gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
+gdi32.SelectObject.restype = wintypes.HGDIOBJ
+gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+gdi32.DeleteObject.restype = wintypes.BOOL
+gdi32.DeleteDC.argtypes = [wintypes.HDC]
+gdi32.DeleteDC.restype = wintypes.BOOL
+gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
+gdi32.CreateCompatibleDC.restype = wintypes.HDC
 
 
 def hex_to_colorref(hex_str: str) -> int:
@@ -398,17 +412,19 @@ class DesktopOverlayManager:
         self.toast_visible = False
         self.toast_expire_ts = 0.0
         self.toast_position = "bottom_right"  # 'top_center' | 'bottom_right'
-        self.toast_title = "Blink Reminder — Rest Your Eyes"
-        self.toast_subtitle = "Close eyes gently for 1 sec"
+        self.toast_title = "TEAR FILM HYDRATION"
+        self.toast_subtitle = "Blink gently twice to replenish tear film & relax focus"
         self.toast_start_ts = 0.0
         self.toast_duration = 4.0
         self.toast_x = 0
         self.toast_y = 0
-        self.toast_w = 430
-        self.toast_h = 54
+        self.toast_w = 490
+        self.toast_h = 60
         self._toast_hdc_mem = None
         self._toast_hbm = None
         self._toast_p_bits = None
+        self._toast_last_w = 0
+        self._toast_last_h = 0
         self._gdiplus_token = ctypes.c_ulong()
         startup_in = GdiplusStartupInput(1, None, False, False)
         try:
@@ -644,8 +660,21 @@ class DesktopOverlayManager:
         w = self.toast_w
         h = self.toast_h
 
-        # Lazily allocate 32-bit DIB and memory DC
-        if not self._toast_hdc_mem or not self._toast_hbm or not self._toast_p_bits:
+        # Lazily allocate 32-bit DIB and memory DC (reallocate if dimension changes)
+        if (
+            not self._toast_hdc_mem
+            or not self._toast_hbm
+            or not self._toast_p_bits
+            or getattr(self, "_toast_last_w", 0) != w
+            or getattr(self, "_toast_last_h", 0) != h
+        ):
+            if self._toast_hbm:
+                gdi32.DeleteObject(self._toast_hbm)
+                self._toast_hbm = None
+            if self._toast_hdc_mem:
+                gdi32.DeleteDC(self._toast_hdc_mem)
+                self._toast_hdc_mem = None
+            self._toast_p_bits = None
             bmi = BITMAPINFO()
             bmi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
             bmi.bmiHeader.biWidth = w
@@ -667,6 +696,8 @@ class DesktopOverlayManager:
             )
             gdi32.SelectObject(self._toast_hdc_mem, self._toast_hbm)
             user32.ReleaseDC(None, hdc_screen)
+            self._toast_last_w = w
+            self._toast_last_h = h
 
         ctypes.memset(self._toast_p_bits, 0, w * h * 4)
 
@@ -790,9 +821,9 @@ class DesktopOverlayManager:
             tag_dot = ctypes.c_void_p()
             gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(tag_dot))
             if is_rtl:
-                gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(w - 56.0), ctypes.c_float(12.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
+                gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(w - 56.0), ctypes.c_float(16.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
             else:
-                gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(54.0), ctypes.c_float(12.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
+                gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(54.0), ctypes.c_float(16.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
             gdiplus.GdipDeleteBrush(tag_dot)
 
             tag_b = ctypes.c_void_p()
@@ -802,14 +833,15 @@ class DesktopOverlayManager:
 
             str_format = ctypes.c_void_p()
             gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(str_format))
-            flags = 0x00001000  # StringFormatFlagsNoWrap
+            # 0x1000 = StringFormatFlagsNoWrap | 0x4000 = StringFormatFlagsNoClip (prevents any top/bottom clipping of descenders or accents)
+            flags = 0x00001000 | 0x00004000
             if is_rtl:
                 flags |= 0x00000001  # DirectionRightToLeft
-                tag_rect = RectF(50.0, 7.5, float(w - 114), 16.0)
-                sub_rect = RectF(50.0, 25.5, float(w - 95), 22.0)
+                tag_rect = RectF(54.0, 10.0, float(w - 120), 20.0)
+                sub_rect = RectF(54.0, 31.0, float(w - 110), 25.0)
             else:
-                tag_rect = RectF(64.0, 7.5, float(w - 115), 16.0)
-                sub_rect = RectF(54.0, 25.5, float(w - 100), 22.0)
+                tag_rect = RectF(64.0, 10.0, float(w - 120), 20.0)
+                sub_rect = RectF(54.0, 31.0, float(w - 110), 25.0)
             gdiplus.GdipSetStringFormatFlags(str_format, flags)
             gdiplus.GdipSetStringFormatTrimming(str_format, 3)  # StringTrimmingEllipsisWord
 
@@ -964,8 +996,8 @@ class DesktopOverlayManager:
             WS_POPUP,
             100,
             100,
-            430,
-            54,
+            490,
+            60,
             None,
             None,
             hinst,
@@ -1082,7 +1114,7 @@ class DesktopOverlayManager:
             if not self.hwnd_toast:
                 return
             wa = self._get_work_area()
-            w, h = 430, 54
+            w, h = 490, 60
             if self.toast_position == "top_center":
                 x = wa.left + ((wa.right - wa.left) - w) // 2
                 y = wa.top + 28
