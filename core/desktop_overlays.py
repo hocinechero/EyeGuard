@@ -556,8 +556,8 @@ class DesktopOverlayManager:
             user32.FillRect(hdc, ctypes.byref(rc), bg_brush)
             gdi32.DeleteObject(bg_brush)
 
-            # 2. Glowing Subtle Teal Rim Border (32px capsule)
-            rim_pen = gdi32.CreatePen(0, 1, 0x0088940D)  # #0d9488 subtle teal
+            # 2. Glowing Subtle Teal Rim Border (32px capsule, subtle 25% opacity)
+            rim_pen = gdi32.CreatePen(0, 1, 0x004E3F18)  # Subtle refined teal rim
             null_brush = gdi32.GetStockObject(NULL_BRUSH)
             old_pen = gdi32.SelectObject(hdc, rim_pen)
             old_brush = gdi32.SelectObject(hdc, null_brush)
@@ -578,7 +578,7 @@ class DesktopOverlayManager:
             gdi32.DeleteObject(badge_brush)
             gdi32.DeleteObject(badge_pen)
 
-            # Stylized Eye Contour (Arc curves + glowing pupil)
+            # Stylized Eye Contour (Smooth eyelid curves + glowing pupil)
             eye_pen = gdi32.CreatePen(0, 1, 0x00BFD42D)  # #2dd4bf
             old_pen = gdi32.SelectObject(hdc, eye_pen)
             gdi32.Arc(hdc, cx - 10, cy - 8, cx + 10, cy + 8, cx + 10, cy, cx - 10, cy)
@@ -586,7 +586,7 @@ class DesktopOverlayManager:
             gdi32.SelectObject(hdc, old_pen)
             gdi32.DeleteObject(eye_pen)
 
-            # Bright pupil dot & white glint
+            # Bright pupil dot & white corneal glint
             pupil_brush = gdi32.CreateSolidBrush(0x00BFD42D)
             null_pen = gdi32.GetStockObject(NULL_PEN)
             old_brush = gdi32.SelectObject(hdc, pupil_brush)
@@ -603,14 +603,19 @@ class DesktopOverlayManager:
             # 4. Text Hierarchy
             gdi32.SetBkMode(hdc, TRANSPARENT)
 
-            # Upper Tag (e.g. TEAR FILM HYDRATION)
+            # Title with leading bullet indicator
+            title_text = self.toast_title
+            if not title_text.startswith("●"):
+                title_text = f"●  {title_text}"
+
+            # Upper Tag (e.g. ● TEAR FILM HYDRATION)
             gdi32.SetTextColor(hdc, 0x00BFD42D)  # #2dd4bf Teal
             f_tag = gdi32.CreateFontW(-11, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
             old_f = gdi32.SelectObject(hdc, f_tag)
-            r1 = wintypes.RECT(54, 9, w - 40, 25)
+            r1 = wintypes.RECT(54, 9, w - 50, 25)
             user32.DrawTextW(
                 hdc,
-                self.toast_title,
+                title_text,
                 -1,
                 ctypes.byref(r1),
                 DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
@@ -622,7 +627,7 @@ class DesktopOverlayManager:
             gdi32.SetTextColor(hdc, 0x00FCFAF8)  # Crisp off-white #F8FAFC
             f_sub = gdi32.CreateFontW(-13, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
             old_f2 = gdi32.SelectObject(hdc, f_sub)
-            r2 = wintypes.RECT(54, 27, w - 40, 49)
+            r2 = wintypes.RECT(54, 27, w - 50, 49)
             user32.DrawTextW(
                 hdc,
                 self.toast_subtitle,
@@ -633,17 +638,26 @@ class DesktopOverlayManager:
             gdi32.SelectObject(hdc, old_f2)
             gdi32.DeleteObject(f_sub)
 
-            # 5. Right-side Hydration Droplet Glow
-            dx, dy = w - 22, h // 2
-            drop_brush = gdi32.CreateSolidBrush(0x00F8BD38)  # #38bdf8 sky-cyan
-            drop_pen = gdi32.CreatePen(0, 1, 0x00BFD42D)
-            old_brush = gdi32.SelectObject(hdc, drop_brush)
-            old_pen = gdi32.SelectObject(hdc, drop_pen)
-            gdi32.Ellipse(hdc, dx - 5, dy - 5, dx + 6, dy + 6)
-            gdi32.SelectObject(hdc, old_brush)
+            # 5. Right-side Circular Progress Ring & Dismiss Indicator
+            cx_r, cy_r = w - 24, h // 2
+            ring_pen = gdi32.CreatePen(0, 1, 0x003F3018)  # subtle ring border
+            null_brush = gdi32.GetStockObject(NULL_BRUSH)
+            old_pen = gdi32.SelectObject(hdc, ring_pen)
+            old_brush = gdi32.SelectObject(hdc, null_brush)
+            gdi32.Ellipse(hdc, cx_r - 9, cy_r - 9, cx_r + 9, cy_r + 9)
             gdi32.SelectObject(hdc, old_pen)
+            gdi32.SelectObject(hdc, old_brush)
+            gdi32.DeleteObject(ring_pen)
+
+            # Center droplet pulse dot in glowing teal
+            drop_brush = gdi32.CreateSolidBrush(0x00BFD42D)
+            null_pen = gdi32.GetStockObject(NULL_PEN)
+            old_brush = gdi32.SelectObject(hdc, drop_brush)
+            old_pen = gdi32.SelectObject(hdc, null_pen)
+            gdi32.Ellipse(hdc, cx_r - 3, cy_r - 3, cx_r + 4, cy_r + 4)
+            gdi32.SelectObject(hdc, old_pen)
+            gdi32.SelectObject(hdc, old_brush)
             gdi32.DeleteObject(drop_brush)
-            gdi32.DeleteObject(drop_pen)
 
         finally:
             user32.EndPaint(hwnd, ctypes.byref(ps))
