@@ -550,21 +550,29 @@ class EyeGuardApp:
         )
 
     def _on_blink_reminder(self):
-        tm = self.config_mgr.get("timer", default={}) or {}
-        pos = str(tm.get("reminder_popup_pos", "top_center"))
-        lang = str(self.config_mgr.get("general", {}).get("language", "en"))
-        if lang == "ar":
-            tag = "ترطيب القرنية وتجديد الدموع"
-            msg = "أغمض جفنيك بلطف الآن لدعم الرطوبة وتنشيط التركيز"
-        else:
-            tag = "TEAR FILM HYDRATION"
-            msg = "Blink gently now to refresh your ocular focus"
-        self.desktop_overlays.show_toast(
-            title=tag,
-            subtitle=msg,
-            position=pos,
-            duration_sec=4.0,
-        )
+        try:
+            tm = self.config_mgr.get("timer", default={}) or {}
+            pos = str(tm.get("reminder_popup_pos", "top_center"))
+            lang = str(self.config_mgr.get("general", "language", default="en"))
+            if lang == "ar":
+                tag = "ترطيب القرنية وتجديد الدموع"
+                msg = "أغمض جفنيك بلطف الآن لدعم الرطوبة وتنشيط التركيز"
+            else:
+                tag = "TEAR FILM HYDRATION"
+                msg = "Blink gently now to refresh your ocular focus"
+            self.desktop_overlays.show_toast(
+                title=tag,
+                subtitle=msg,
+                position=pos,
+                duration_sec=4.0,
+            )
+        except Exception:
+            self.desktop_overlays.show_toast(
+                title="TEAR FILM HYDRATION",
+                subtitle="Blink gently now to refresh your ocular focus",
+                position="top_center",
+                duration_sec=4.0,
+            )
 
     def trigger_blink_preview(self):
         """Immediately trigger the native desktop blink reminder toast for testing."""
