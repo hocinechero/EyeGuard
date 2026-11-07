@@ -3730,7 +3730,10 @@
         let blinkToastTimer = null;
         function showBlinkToast() {
             if (window.pywebview && window.pywebview.api && window.pywebview.api.trigger_blink_preview) {
-                try { window.pywebview.api.trigger_blink_preview(); } catch (e) {}
+                try {
+                    window.pywebview.api.trigger_blink_preview();
+                    return; // Suppress in-app duplicate; desktop overlay handles the notification exclusively
+                } catch (e) {}
             }
             const toast = document.getElementById('blink-reminder-toast');
             if (!toast) return;
@@ -6240,10 +6243,9 @@
                             }
                         }
 
-                        // Blink reminder toast trigger
+                        // Blink reminder toast trigger (backend timer triggers native desktop overlay directly)
                         if (st.blink_reminder && st.last_blink_anim_ts && st.last_blink_anim_ts !== lastSeenBlinkTs) {
                             lastSeenBlinkTs = st.last_blink_anim_ts;
-                            showBlinkToast();
                         }
 
                         if (typeof st.circadian_active === 'boolean') {
