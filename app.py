@@ -183,22 +183,8 @@ def force_foreground_window(hwnd: int):
             user32.BringWindowToTop(hwnd)
             user32.SetForegroundWindow(hwnd)
 
-        # Multi-monitor bounds
-        vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
-        vy = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
-        vw = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
-        vh = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
-        if vw <= 0 or vh <= 0:
-            vx, vy = 0, 0
-            vw = user32.GetSystemMetrics(0)
-            vh = user32.GetSystemMetrics(1)
-
-        user32.SetWindowPos(
-            hwnd,
-            ctypes.c_void_p(-1),  # HWND_TOPMOST
-            vx, vy, vw, vh,
-            0x0020 | 0x0040  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
-        )
+        # Ensure window is NOT forced to topmost over taskbar, and keep existing geometry
+        user32.BringWindowToTop(hwnd)
         user32.UpdateWindow(hwnd)
     except Exception:
         pass
@@ -438,11 +424,98 @@ class EyeGuardApp:
     def _get_main_hwnd(self) -> int:
         return int(user32.FindWindowW(None, "EyeGuard") or 0)
 
+    def _ensure_window_within_workarea(self, hwnd: int):
+        """
+        Enforces strict work-area constraints (never obscuring or overlapping the taskbar).
+        If the window was maximized or stretched too tall, safely clamps and centers it.
+        """
+        if not hwnd or not user32.IsWindow(hwnd):
+            return
+        try:
+            hmon = user32.MonitorFromWindow(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
+            if not hmon:
+                return
+
+            class MONITORINFO(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", wintypes.DWORD),
+                    ("rcMonitor", wintypes.RECT),
+                    ("rcWork", wintypes.RECT),
+                    ("dwFlags", wintypes.DWORD),
+                ]
+
+            mi = MONITORINFO()
+            mi.cbSize = ctypes.sizeof(MONITORINFO)
+            if not user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+                return
+
+            work_w = mi.rcWork.right - mi.rcWork.left
+            work_h = mi.rcWork.bottom - mi.rcWork.top
+
+            rc = wintypes.RECT()
+            if not user32.GetWindowRect(hwnd, ctypes.byref(rc)):
+                return
+
+            curr_w = rc.right - rc.left
+            curr_h = rc.bottom - rc.top
+
+            mon_h = mi.rcMonitor.bottom - mi.rcMonitor.top
+            needs_reposition = False
+            target_w = curr_w
+            target_h = curr_h
+            target_x = rc.left
+            target_y = rc.top
+
+            # If window is excessively large (greater than work area or >= 95% of screen height)
+            if curr_w > work_w or curr_h > work_h or (curr_h >= int(mon_h * 0.95)):
+                target_w = min(840, max(740, int(work_w * 0.85)))
+                target_h = min(580, max(500, int(work_h * 0.88)))
+                target_x = mi.rcWork.left + (work_w - target_w) // 2
+                target_y = mi.rcWork.top + (work_h - target_h) // 2
+                needs_reposition = True
+            else:
+                if target_h > work_h:
+                    target_h = min(580, int(work_h * 0.88))
+                    needs_reposition = True
+                if target_y + target_h > mi.rcWork.bottom:
+                    target_y = mi.rcWork.bottom - target_h
+                    needs_reposition = True
+                if target_y < mi.rcWork.top:
+                    target_y = mi.rcWork.top
+                    needs_reposition = True
+                if target_x + target_w > mi.rcWork.right:
+                    target_x = mi.rcWork.right - target_w
+                    needs_reposition = True
+                if target_x < mi.rcWork.left:
+                    target_x = mi.rcWork.left
+                    needs_reposition = True
+
+            flags = 0x0040 | 0x0020  # SWP_SHOWWINDOW | SWP_FRAMECHANGED
+            if not needs_reposition:
+                flags |= 0x0001 | 0x0002  # SWP_NOSIZE | SWP_NOMOVE
+            user32.SetWindowPos(
+                hwnd,
+                ctypes.c_void_p(-2),  # HWND_NOTOPMOST
+                target_x,
+                target_y,
+                target_w,
+                target_h,
+                flags,
+            )
+        except Exception:
+            pass
+
     def show_window(self):
         self._is_window_hidden = False
         hwnd = self._get_main_hwnd()
         if hwnd:
             try:
+                user32.SetWindowPos(
+                    hwnd,
+                    ctypes.c_void_p(-2),  # HWND_NOTOPMOST
+                    0, 0, 0, 0,
+                    0x0001 | 0x0002 | 0x0040  # SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW
+                )
                 user32.ShowWindow(hwnd, 9)  # SW_RESTORE
             except Exception:
                 pass
@@ -455,6 +528,7 @@ class EyeGuardApp:
         if hwnd:
             try:
                 force_foreground_window(hwnd)
+                self._ensure_window_within_workarea(hwnd)
             except Exception:
                 pass
 
@@ -483,8 +557,16 @@ class EyeGuardApp:
             self._saved_win_rect = (rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top)
             self._saved_win_style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
 
-            sw = user32.GetSystemMetrics(0)
-            sh = user32.GetSystemMetrics(1)
+            # Multi-monitor bounds strictly for break fullscreen
+            vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+            vy = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+            vw = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+            vh = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+            if vw <= 0 or vh <= 0:
+                vx, vy = 0, 0
+                vw = user32.GetSystemMetrics(0)
+                vh = user32.GetSystemMetrics(1)
+
             # WS_POPUP | WS_VISIBLE = 0x90000000
             user32.SetWindowLongW(hwnd, -16, 0x90000000)
             if transparency_pct < 100:
@@ -492,6 +574,12 @@ class EyeGuardApp:
                 user32.SetWindowLongW(hwnd, -20, ex | 0x00080000)  # WS_EX_LAYERED
                 alpha = max(140, min(255, int(255 * (transparency_pct / 100.0))))
                 user32.SetLayeredWindowAttributes(hwnd, 0, alpha, 2)
+            user32.SetWindowPos(
+                hwnd,
+                ctypes.c_void_p(-1),  # HWND_TOPMOST
+                vx, vy, vw, vh,
+                0x0020 | 0x0040  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
+            )
             force_foreground_window(hwnd)
         except Exception:
             pass
@@ -2210,13 +2298,21 @@ def run_app():
         (p for p in candidate_paths if os.path.exists(p)), candidate_paths[0]
     )
 
+    # Determine initial window size based on screen workarea
+    work_rc = wintypes.RECT()
+    user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(work_rc), 0)  # SPI_GETWORKAREA
+    avail_w = max(800, work_rc.right - work_rc.left)
+    avail_h = max(560, work_rc.bottom - work_rc.top)
+    init_w = min(840, max(740, int(avail_w * 0.85)))
+    init_h = min(580, max(500, int(avail_h * 0.88)))
+
     app._window = webview.create_window(
         title="EyeGuard",
         url=html_file,
         js_api=api,
-        width=820,
-        height=640,
-        min_size=(760, 560),
+        width=init_w,
+        height=init_h,
+        min_size=(740, 500),
         background_color="#181b20",
     )
 
