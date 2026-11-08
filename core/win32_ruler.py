@@ -407,6 +407,11 @@ class Win32FocusRuler:
             self._send_command('TOGGLE_SPOTLIGHT', None)
         return self._spotlight_active
 
+    def recalibrate_metrics(self):
+        """Notifies the background ruler thread to re-query virtual desktop bounds and reposition overlays."""
+        if self._running:
+            self._send_command('RECALIBRATE_METRICS', None)
+
     def get_focus_state(self) -> Dict[str, Any]:
         return {
             "reading_active": self._is_active,
@@ -618,6 +623,13 @@ class Win32FocusRuler:
                 self._is_active = False
                 self._spotlight_active = True
                 self._enable_spotlight_internal()
+        elif cmd == 'RECALIBRATE_METRICS':
+            self._update_virtual_desktop_metrics()
+            if self._is_active:
+                self._reposition()
+            elif self._spotlight_active:
+                self._cur_spot_rect = None
+                self._track_spotlight_step(force=True)
         elif cmd == 'DESTROY':
             self._spotlight_active = False
             self._disable_internal()
@@ -854,10 +866,14 @@ class Win32FocusRuler:
         try:
             from core.window_focus import is_foreground_fullscreen
             if is_foreground_fullscreen(fg):
-                for h in (self._hwnd_spot_top, self._hwnd_spot_bot, self._hwnd_spot_left, self._hwnd_spot_right):
+                for h in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
                     if h and user32.IsWindowVisible(h):
                         user32.ShowWindow(h, 0)
                 return
+            elif self._hwnd_top and not user32.IsWindowVisible(self._hwnd_top):
+                for h in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
+                    if h:
+                        user32.ShowWindow(h, 4)  # SW_SHOWNOACTIVATE
         except Exception:
             pass
 

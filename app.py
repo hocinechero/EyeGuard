@@ -89,10 +89,10 @@ HOTKEY_METADATA = [
     },
     {
         "id": "reset_natural",
-        "name_ar": "Reset Natural (6500K / 100%)",
-        "name_en": "Reset Natural (6500K / 100%)",
-        "desc_ar": "Instantly restore standard daylight calibration",
-        "desc_en": "Instantly restore standard daylight calibration",
+        "name_ar": "Universal Screen Restore (6500K / 100%)",
+        "name_en": "Universal Screen Restore (6500K / 100%)",
+        "desc_ar": "Instantly restore daylight calibration and clear any active overlays or spotlight masks",
+        "desc_en": "Instantly restore daylight calibration and clear any active overlays or spotlight masks",
         "default": "Ctrl + Alt + D",
     },
     {
@@ -665,6 +665,24 @@ class EyeGuardApp:
         self.config_mgr.set("screen", "color_filter_mode", "day")
         self.config_mgr.set("screen", "mode", "Natural")
         self.gamma_engine.set_display(6500, 100, False, False, smooth=False, color_mode="day")
+
+        # Universal Emergency Unlock: disable focus ruler, spotlight mask, and clear stuck overlays
+        if hasattr(self, "focus_ruler"):
+            try:
+                self.focus_ruler.disable()
+            except Exception:
+                pass
+        if hasattr(self, "magic_engine"):
+            try:
+                self.magic_engine.restore_all_windows()
+            except Exception:
+                pass
+        if hasattr(self, "desktop_overlays"):
+            try:
+                self.desktop_overlays.hide_overlay()
+            except Exception:
+                pass
+
         self._schedule_tray_update()
         return {"kelvin": 6500, "brightness": 100, "mode": "day"}
 
@@ -1709,8 +1727,8 @@ class EyeGuardApp:
                 self.current_k, self.current_b, self.is_gray, self.is_invert,
                 smooth=True, color_mode=self.color_filter_mode
             )
-            if self.focus_ruler.is_active or self.focus_ruler.is_spotlight_active:
-                self.focus_ruler._update_virtual_desktop_metrics()
+            if hasattr(self, "focus_ruler"):
+                self.focus_ruler.recalibrate_metrics()
         except Exception:
             pass
 
@@ -1722,8 +1740,8 @@ class EyeGuardApp:
                 self.current_k, self.current_b, self.is_gray, self.is_invert,
                 smooth=False, color_mode=self.color_filter_mode
             )
-            if self.focus_ruler.is_active or self.focus_ruler.is_spotlight_active:
-                self.focus_ruler._update_virtual_desktop_metrics()
+            if hasattr(self, "focus_ruler"):
+                self.focus_ruler.recalibrate_metrics()
         except Exception:
             pass
 
