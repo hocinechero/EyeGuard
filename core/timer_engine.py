@@ -22,6 +22,17 @@ def _is_workstation_locked() -> bool:
         return False
 
 
+def _is_mouse_button_held() -> bool:
+    """Detects if the left or right mouse button is actively pressed (e.g. dragging or selecting)."""
+    try:
+        return bool(
+            (user32.GetAsyncKeyState(0x01) & 0x8000)
+            or (user32.GetAsyncKeyState(0x02) & 0x8000)
+        )
+    except Exception:
+        return False
+
+
 class TimerState(str, enum.Enum):
     WORKING = "working"
     PAUSED = "paused"
@@ -61,7 +72,7 @@ class BreakTimerEngine:
         restart_on_idle: bool = True,
         restart_idle_minutes: int = 15,
         restart_on_unlock: bool = True,
-        pre_break_prompt_sec: int = 30,
+        pre_break_prompt_sec: int = 10,
         allow_delay_timer: bool = True,
         max_delay_times: int = 3,
     ):
@@ -83,6 +94,8 @@ class BreakTimerEngine:
 
         self.delays_used = 0
         self._pre_prompt_fired = False
+        self._pre_prompt_10s_fired = False
+        self._pre_blink_prompt_fired = False
         self._was_workstation_locked = False
 
         self._pause_until_ts: Optional[float] = None
@@ -218,6 +231,7 @@ class BreakTimerEngine:
                 self.state = TimerState.WORKING
                 self.blink_remaining_sec = 0
                 self.blink_counter_sec = self._blink_interval
+                self._pre_blink_prompt_fired = False
                 if self.on_break_end:
                     callbacks.append(self.on_break_end)
             elif self.state in (TimerState.SHORT_BREAK, TimerState.LONG_BREAK):
@@ -227,6 +241,8 @@ class BreakTimerEngine:
                 self.blink_counter_sec = self._blink_interval
                 self.delays_used = 0
                 self._pre_prompt_fired = False
+                self._pre_prompt_10s_fired = False
+                self._pre_blink_prompt_fired = False
                 if self.on_break_end:
                     callbacks.append(self.on_break_end)
 
@@ -291,6 +307,8 @@ class BreakTimerEngine:
                 return False
             self.delays_used += 1
             self._pre_prompt_fired = False
+            self._pre_prompt_10s_fired = False
+            self._pre_blink_prompt_fired = False
             self.state = TimerState.WORKING
             self.work_remaining_sec = max(self.work_remaining_sec, minutes * 60)
             self.blink_counter_sec = max(self.blink_counter_sec, minutes * 60)
@@ -310,6 +328,8 @@ class BreakTimerEngine:
             self.blink_counter_sec = self._blink_interval
             self.delays_used = 0
             self._pre_prompt_fired = False
+            self._pre_prompt_10s_fired = False
+            self._pre_blink_prompt_fired = False
             self.state = TimerState.PAUSED
             self._paused_manually = True
 
@@ -436,6 +456,19 @@ class BreakTimerEngine:
         except Exception:
             pass
 
+    def _invoke_pre_break_prompt(self, remaining_sec: int, break_type: str = "short_break"):
+        if not self.on_pre_break_prompt:
+            return
+        try:
+            self.on_pre_break_prompt(remaining_sec, break_type)
+        except TypeError:
+            try:
+                self.on_pre_break_prompt(remaining_sec)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     def tick(self, delta_sec: float = 1.0) -> Dict[str, Any]:
         delta = max(0.0, float(delta_sec))
         callbacks_to_fire = []
@@ -461,6 +494,8 @@ class BreakTimerEngine:
                     self.blink_counter_sec = self._blink_interval
                     self.delays_used = 0
                     self._pre_prompt_fired = False
+                    self._pre_prompt_10s_fired = False
+                    self._pre_blink_prompt_fired = False
                 self._was_workstation_locked = locked_now
 
             # Check full timer restart after prolonged mouse inactivity
@@ -473,6 +508,8 @@ class BreakTimerEngine:
                 self.blink_counter_sec = self._blink_interval
                 self.delays_used = 0
                 self._pre_prompt_fired = False
+                self._pre_prompt_10s_fired = False
+                self._pre_blink_prompt_fired = False
 
             if self._paused_manually and self._pause_until_ts is not None:
                 if time.time() >= self._pause_until_ts:
@@ -506,7 +543,16 @@ class BreakTimerEngine:
                             if self.on_blink_reminder:
                                 callbacks_to_fire.append((self.on_blink_reminder, ()))
 
-                    # Pre-break prompt notification (for fullscreen / strict breaks)
+                    upcoming_pomo_type = (
+                        "long_break"
+                        if (
+                            self.cycles_before_long > 0
+                            and (self.cycle_count + 1) >= self.cycles_before_long
+                        )
+                        else "short_break"
+                    )
+
+                    # Pre-break prompt notification (for fullscreen / strict Pomodoro breaks)
                     if (
                         self.enable_pomodoro
                         and self.break_mode in ("fullscreen", "strict")
@@ -514,27 +560,75 @@ class BreakTimerEngine:
                         and not self._pre_prompt_fired
                     ):
                         self._pre_prompt_fired = True
+                        if self.work_remaining_sec <= 10:
+                            self._pre_prompt_10s_fired = True
                         if self.on_pre_break_prompt:
                             callbacks_to_fire.append(
-                                (self.on_pre_break_prompt, (int(self.work_remaining_sec),))
+                                (
+                                    self._invoke_pre_break_prompt,
+                                    (int(self.work_remaining_sec), upcoming_pomo_type),
+                                )
+                            )
+                    elif (
+                        self.enable_pomodoro
+                        and self.break_mode in ("fullscreen", "strict")
+                        and self.pre_break_prompt_sec > 10
+                        and 0 < self.work_remaining_sec <= 10
+                        and not self._pre_prompt_10s_fired
+                    ):
+                        self._pre_prompt_10s_fired = True
+                        if self.on_pre_break_prompt:
+                            callbacks_to_fire.append(
+                                (
+                                    self._invoke_pre_break_prompt,
+                                    (int(self.work_remaining_sec), upcoming_pomo_type),
+                                )
                             )
 
-                    # Do-Not-Disturb during fullscreen apps (when not in unit tests)
+                    # Pre-break 10s prompt notification for 20-20-20 short eye break
+                    blink_prompt_lead = min(10, self.pre_break_prompt_sec)
+                    if (
+                        self.enable_20_20
+                        and self.break_mode in ("fullscreen", "strict")
+                        and 0 < self.blink_counter_sec <= blink_prompt_lead
+                        and not self._pre_blink_prompt_fired
+                        and (not self.enable_pomodoro or self.work_remaining_sec > blink_prompt_lead)
+                    ):
+                        self._pre_blink_prompt_fired = True
+                        if self.on_pre_break_prompt:
+                            callbacks_to_fire.append(
+                                (
+                                    self._invoke_pre_break_prompt,
+                                    (int(self.blink_counter_sec), "blink_20_20"),
+                                )
+                            )
+
+                    # Do-Not-Disturb during fullscreen apps or active mouse dragging (when not in unit tests)
                     dnd_hold = False
-                    if not is_unit_test and self.dnd_fullscreen:
-                        try:
-                            from core.window_focus import is_foreground_fullscreen
-                            dnd_hold = is_foreground_fullscreen()
-                        except Exception:
-                            dnd_hold = False
+                    mouse_drag_hold = False
+                    if not is_unit_test:
+                        mouse_drag_hold = _is_mouse_button_held()
+                        if self.dnd_fullscreen:
+                            try:
+                                from core.window_focus import is_foreground_fullscreen
+                                dnd_hold = is_foreground_fullscreen()
+                            except Exception:
+                                dnd_hold = False
 
                     if dnd_hold and self.work_remaining_sec <= 0:
                         self.work_remaining_sec = 5
+                    elif mouse_drag_hold and (self.work_remaining_sec <= 0 or self.blink_counter_sec <= 0):
+                        if self.work_remaining_sec <= 0:
+                            self.work_remaining_sec = 1
+                        if self.blink_counter_sec <= 0:
+                            self.blink_counter_sec = 1
 
                     # Check Pomodoro work session completion first
                     elif self.enable_pomodoro and self.work_remaining_sec <= 0:
                         self.work_remaining_sec = 0
                         self._pre_prompt_fired = False
+                        self._pre_prompt_10s_fired = False
+                        self._pre_blink_prompt_fired = False
                         self.cycle_count += 1
                         if (
                             self.cycles_before_long > 0
@@ -566,6 +660,7 @@ class BreakTimerEngine:
                         self.state = TimerState.BLINK_20_20
                         self.blink_remaining_sec = self.blink_duration_sec
                         self.blink_counter_sec = self._blink_interval
+                        self._pre_blink_prompt_fired = False
                         if self.on_break_trigger:
                             callbacks_to_fire.append(
                                 (

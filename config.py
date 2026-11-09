@@ -49,7 +49,7 @@ DEFAULT_CONFIG = {
         "restart_idle_minutes": 15,
         "restart_on_unlock": True,
         "reminder_popup_pos": "top_center",
-        "pre_break_prompt_sec": 30,
+        "pre_break_prompt_sec": 10,
         "allow_delay_timer": True,
         "max_delay_times": 3,
         "require_hold_3s_skip": True,

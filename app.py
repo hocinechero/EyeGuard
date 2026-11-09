@@ -156,8 +156,8 @@ HOTKEY_METADATA = [
 
 def force_foreground_window(hwnd: int):
     """
-    Guarantees window is brought to absolute foreground on top of all other windows,
-    bypassing Windows Foreground Lock Timeout via AttachThreadInput.
+    Brings window to foreground cleanly using standard Win32 window activation
+    without cross-process input thread attachment.
     """
     if not hwnd or not user32.IsWindow(hwnd):
         return
@@ -167,24 +167,8 @@ def force_foreground_window(hwnd: int):
         else:
             user32.ShowWindow(hwnd, 5)  # SW_SHOW
 
-        fg_hwnd = user32.GetForegroundWindow()
-        if fg_hwnd and fg_hwnd != hwnd:
-            fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
-            cur_tid = kernel32.GetCurrentThreadId()
-            if fg_tid and cur_tid and fg_tid != cur_tid:
-                user32.AttachThreadInput(cur_tid, fg_tid, True)
-                user32.BringWindowToTop(hwnd)
-                user32.SetForegroundWindow(hwnd)
-                user32.AttachThreadInput(cur_tid, fg_tid, False)
-            else:
-                user32.BringWindowToTop(hwnd)
-                user32.SetForegroundWindow(hwnd)
-        else:
-            user32.BringWindowToTop(hwnd)
-            user32.SetForegroundWindow(hwnd)
-
-        # Ensure window is NOT forced to topmost over taskbar, and keep existing geometry
         user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
         user32.UpdateWindow(hwnd)
     except Exception:
         pass
@@ -348,7 +332,7 @@ class EyeGuardApp:
             restart_on_idle=bool(tm_cfg.get("restart_on_idle", True)),
             restart_idle_minutes=int(tm_cfg.get("restart_idle_minutes", 15)),
             restart_on_unlock=bool(tm_cfg.get("restart_on_unlock", True)),
-            pre_break_prompt_sec=int(tm_cfg.get("pre_break_prompt_sec", 30)),
+            pre_break_prompt_sec=int(tm_cfg.get("pre_break_prompt_sec", 10)),
             allow_delay_timer=bool(tm_cfg.get("allow_delay_timer", True)),
             max_delay_times=int(tm_cfg.get("max_delay_times", 3)),
         )
@@ -547,6 +531,30 @@ class EyeGuardApp:
                 pass
 
 
+    def _get_primary_monitor_center_pct(self) -> Tuple[float, float]:
+        """
+        Calculates the geometric center of the Primary Monitor expressed as percentages
+        (0..100) of the total multi-monitor Virtual Screen span so the break card
+        windowlet always appears centered on the main monitor.
+        """
+        try:
+            vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
+            vy = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
+            vw = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
+            vh = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+            pw = user32.GetSystemMetrics(0)   # SM_CXSCREEN (Primary monitor width)
+            ph = user32.GetSystemMetrics(1)   # SM_CYSCREEN (Primary monitor height)
+            if vw > 0 and vh > 0 and pw > 0 and ph > 0:
+                cx_pct = (((0.0 - vx) + (pw / 2.0)) / float(vw)) * 100.0
+                cy_pct = (((0.0 - vy) + (ph / 2.0)) / float(vh)) * 100.0
+                return (
+                    round(max(10.0, min(90.0, cx_pct)), 2),
+                    round(max(10.0, min(90.0, cy_pct)), 2),
+                )
+        except Exception:
+            pass
+        return (50.0, 50.0)
+
     def _enter_fullscreen_kiosk_mode(self, transparency_pct: int = 100):
         hwnd = self._get_main_hwnd()
         if not hwnd:
@@ -654,14 +662,36 @@ class EyeGuardApp:
         elif action == "pin":
             self.magic_engine.toggle_pin_foreground_window(target_hwnd=target_hwnd)
 
-    def _on_pre_break_prompt(self, remaining_sec: int):
+    def _on_pre_break_prompt(self, remaining_sec: int, break_type: str = "short_break"):
         tm = self.config_mgr.get("timer", default={}) or {}
         pos = str(tm.get("reminder_popup_pos", "top_center"))
+        lang = str(self.config_mgr.get("general", "language", default="en"))
+        b_str = str(break_type or "short_break")
+        if lang == "ar":
+            if b_str == "blink_20_20":
+                title = f"استراحة 20-20-20 — تبدأ خلال {remaining_sec} ثانية"
+                sub = "استعد لإراحة عينيك لمدة 20 ثانية."
+            elif b_str == "long_break":
+                title = f"استراحة طويلة — تبدأ خلال {remaining_sec} ثانية"
+                sub = "احفظ عملك الآن؛ ستبدأ جلسة راحة العين قريباً."
+            else:
+                title = f"استراحة قصيرة — تبدأ خلال {remaining_sec} ثانية"
+                sub = "احفظ عملك الآن؛ ستبدأ استراحة قصيرة للعين."
+        else:
+            if b_str == "blink_20_20":
+                title = f"Short Eye Break — Starting in {remaining_sec}s"
+                sub = "20-20-20 micro-break approaching; finish your current action."
+            elif b_str == "long_break":
+                title = f"Long Eye Break — Starting in {remaining_sec}s"
+                sub = "Save your work now; a long eye relaxation break is about to start."
+            else:
+                title = f"Short Eye Break — Starting in {remaining_sec}s"
+                sub = "Save your work now; an eye relaxation break is about to start."
         self.desktop_overlays.show_toast(
-            title=f"Break Reminder — Starting in {remaining_sec}s",
-            subtitle="Save your work now; an eye relaxation break is about to start.",
+            title=title,
+            subtitle=sub,
             position=pos,
-            duration_sec=5.0,
+            duration_sec=float(max(3, min(int(remaining_sec), 10))),
         )
 
     def _on_blink_reminder(self):
@@ -1073,6 +1103,10 @@ class EyeGuardApp:
                 duration_sec=8.0,
             )
         else:
+            try:
+                self.desktop_overlays.hide_toast()
+            except Exception:
+                pass
             cust_wp_url = ""
             wp_path = str(tm_cfg.get("custom_wallpaper_path", "")).strip()
             if tm_cfg.get("use_custom_wallpaper", False) and wp_path and os.path.isfile(wp_path):
@@ -1081,11 +1115,14 @@ class EyeGuardApp:
                 except Exception:
                     cust_wp_url = ""
 
+            cx_pct, cy_pct = self._get_primary_monitor_center_pct()
             self._active_break = {
                 "type": b_str,
                 "duration": int(duration_sec),
                 "mode": self.timer_engine.break_mode,
                 "id": int(time.time() * 1000),
+                "primary_center_x_pct": cx_pct,
+                "primary_center_y_pct": cy_pct,
                 "transparency": int(tm_cfg.get("lock_screen_transparency", 100)),
                 "fade": str(tm_cfg.get("lock_screen_fade", "fast")),
                 "random_wallpaper": bool(tm_cfg.get("random_lock_wallpaper", True)),

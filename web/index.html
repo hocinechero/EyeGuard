@@ -2919,9 +2919,9 @@
                                 <div style="font-size:10px; color:var(--text-tertiary);">Applies to fullscreen and strict breaks.</div>
                             </div>
                             <select class="care-select" id="opt-tm-preprompt" onchange="saveTimerOptionsSubtab()">
-                                <option value="10">10 seconds</option>
+                                <option value="10" selected>10 seconds</option>
                                 <option value="20">20 seconds</option>
-                                <option value="30" selected>30 seconds</option>
+                                <option value="30">30 seconds</option>
                                 <option value="60">60 seconds</option>
                             </select>
                         </div>
@@ -5268,6 +5268,17 @@
             const meta = breakMeta || {};
             const mode = modeOverride || meta.mode || currentBreakMode || 'fullscreen';
 
+            // Position the break windowlet card strictly on the primary monitor center
+            const modalCard = overlay.querySelector('.break-modal-glass');
+            if (modalCard) {
+                const cxPct = (typeof meta.primary_center_x_pct === 'number') ? meta.primary_center_x_pct : 50;
+                const cyPct = (typeof meta.primary_center_y_pct === 'number') ? meta.primary_center_y_pct : 50;
+                modalCard.style.position = 'fixed';
+                modalCard.style.left = `${cxPct}%`;
+                modalCard.style.top = `${cyPct}%`;
+                modalCard.style.transform = 'translate(-50%, -50%)';
+            }
+
             // Apply transparency & fade speed
             const transPct = meta.transparency || (document.getElementById('opt-brk-trans') ? parseInt(document.getElementById('opt-brk-trans').value) : 100) || 100;
             overlay.style.opacity = String(Math.max(0.5, Math.min(1.0, transPct / 100.0)));
@@ -5570,7 +5581,7 @@
 
             const payload = {
                 reminder_popup_pos: currentPopupPos,
-                pre_break_prompt_sec: parseInt(document.getElementById('opt-tm-preprompt').value) || 30,
+                pre_break_prompt_sec: parseInt(document.getElementById('opt-tm-preprompt').value) || 10,
                 allow_delay_timer: document.getElementById('opt-tm-allow-delay').checked,
                 max_delay_times: parseInt(document.getElementById('opt-tm-delay-times').value) || 3,
                 auto_pause_on_idle: document.getElementById('opt-tm-pause-idle').checked,

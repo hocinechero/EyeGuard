@@ -291,20 +291,23 @@ class HotkeyEngine:
             items_to_reg = list(self._bindings.items())
 
         for name, data in items_to_reg:
-            combo_str = data.get("combo")
-            if not combo_str:
-                continue
-            parsed = parse_shortcut(combo_str)
-            if not parsed:
-                continue
-            mods, vk = parsed
-            hid = data["id"]
-            ok = user32.RegisterHotKey(None, hid, mods, vk)
-            if ok:
-                self._registered_ids.add(hid)
-            else:
-                err = kernel32.GetLastError()
-                self.failed_registrations[action] = err
+            try:
+                combo_str = data.get("combo")
+                if not combo_str:
+                    continue
+                parsed = parse_shortcut(combo_str)
+                if not parsed:
+                    continue
+                mods, vk = parsed
+                hid = data["id"]
+                ok = user32.RegisterHotKey(None, hid, mods, vk)
+                if ok:
+                    self._registered_ids.add(hid)
+                else:
+                    err = kernel32.GetLastError()
+                    self.failed_registrations[name] = err
+            except Exception:
+                pass
 
     def _msg_loop(self):
         # 1. Force Win32 message queue creation
