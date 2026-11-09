@@ -879,6 +879,17 @@ class EyeGuardApp:
         self.config_mgr.set("presets", default_presets)
         return default_presets
 
+    def open_url(self, url: str):
+        import webbrowser
+        try:
+            s = str(url or "").strip()
+            if s.startswith("https://") or s.startswith("http://"):
+                webbrowser.open(s)
+                return {"ok": True}
+        except Exception:
+            pass
+        return {"ok": False}
+
     def set_kelvin(self, k: int):
         self._filter_disabled_until_ts = None
         if self.circadian_active:
@@ -1976,6 +1987,9 @@ class JSBridgeApi:
 
     def reset_presets_to_default(self):
         return self._app.reset_presets_to_default()
+
+    def open_url(self, url):
+        return self._app.open_url(url)
 
     def reset_presets_default(self):
         return self._app.reset_presets_to_default()

@@ -3251,6 +3251,22 @@
                     <p style="font-size: 11px; color:var(--text-secondary); max-width:480px; margin:0 auto 12px auto; line-height: 1.5;">
                         Developed and optimized over days of intensive engineering using advanced AI workflows and specialized side tools (including REA systems and Win32 forensic analysis) by <b>@hocine_chero</b>.
                     </p>
+                    <!-- Community, Feedback & Official Links -->
+                    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:14px;">
+                        <button class="btn-linear btn-linear-primary" onclick="openExternalUrl('https://www.reddit.com/r/EyeGuard/')" style="display:inline-flex; align-items:center; gap:6px; font-weight:600;">
+                            <span>💬 Reddit Community (r/EyeGuard)</span>
+                        </button>
+                        <button class="btn-linear btn-linear-secondary" onclick="openExternalUrl('https://github.com/hocinechero/EyeGuard/discussions')" style="display:inline-flex; align-items:center; gap:6px;">
+                            <span>📢 Announcements & Discussions</span>
+                        </button>
+                        <button class="btn-linear btn-linear-secondary" onclick="openExternalUrl('https://github.com/hocinechero/EyeGuard/issues/new')" style="display:inline-flex; align-items:center; gap:6px;">
+                            <span>🐛 Report a Bug</span>
+                        </button>
+                        <button class="btn-linear btn-linear-secondary" onclick="openExternalUrl('https://github.com/hocinechero/EyeGuard/releases')" style="display:inline-flex; align-items:center; gap:6px;">
+                            <span>📦 Releases & Changelog</span>
+                        </button>
+                    </div>
+
                     <div style="display:inline-flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:16px;">
                         <button class="btn-linear btn-linear-secondary" onclick="resetPresetsToDefault()">Factory Reset Presets</button>
                     </div>
@@ -3303,7 +3319,15 @@
     </section>
 
     <script>
-                function copyDonationAddr(text, btn) {
+                function openExternalUrl(url) {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.open_url) {
+                window.pywebview.api.open_url(url);
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
+        function copyDonationAddr(text, btn) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(() => {
                     const orig = btn.innerText;
