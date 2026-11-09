@@ -185,7 +185,7 @@ Control your reading environment without opening the app or leaving full-screen 
 
 ## 🛠️ Development & Engineering Journey
 
-EyeGuard was crafted and audited across intensive days of systems programming and interface design. The engineering process combined advanced **Artificial Intelligence (AI-assisted engineering)** and specialized forensic side-tooling (including **REA** and Win32 API analysis) to:
+EyeGuard was crafted and audited across intensive days of systems programming and interface design. The engineering process combined advanced Artificial Intelligence (AI-assisted engineering) and specialized forensic side-tooling (including Win32 API analysis) to:
 - Dissect and overcome multi-monitor display contention and hardware gamma ramps.
 - Guarantee non-blocking, zero-lag cursor tracking for the digital reading ruler.
 - Architect the standalone crash-recovery watchdog (crash_guard.py) to ensure 100% fail-safe display restoration even on sudden power or OS faults.
