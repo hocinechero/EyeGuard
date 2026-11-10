@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 
 DEFAULT_CONFIG = {
-    "version": "2.1.1",
+    "version": "3.0.0",
     "screen": {
         "enabled": True,
         "mode": "Health",
@@ -52,6 +52,7 @@ DEFAULT_CONFIG = {
         "pre_break_prompt_sec": 10,
         "allow_delay_timer": True,
         "max_delay_times": 3,
+        "postpone_minutes": 5,
         "require_hold_3s_skip": True,
         "break_mode": "fullscreen",
         "blink_reminder": False,

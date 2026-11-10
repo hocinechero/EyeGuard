@@ -191,6 +191,8 @@ class EyeGuardApp:
         self.desktop_overlays = DesktopOverlayManager(
             on_toolbar_action=self._on_magic_toolbar_action,
             on_open_main_window=self.show_window,
+            on_toast_postpone=self._on_toast_postpone,
+            on_toast_skip=self._on_toast_skip,
         )
 
         # 3. Display & Solar Engines
@@ -662,36 +664,52 @@ class EyeGuardApp:
         elif action == "pin":
             self.magic_engine.toggle_pin_foreground_window(target_hwnd=target_hwnd)
 
+    def _on_toast_postpone(self, minutes: int):
+        self.postpone_break(minutes=minutes)
+
+    def _on_toast_skip(self):
+        self.skip_break()
+
     def _on_pre_break_prompt(self, remaining_sec: int, break_type: str = "short_break"):
         tm = self.config_mgr.get("timer", default={}) or {}
         pos = str(tm.get("reminder_popup_pos", "top_center"))
+        postpone_mins = int(tm.get("postpone_minutes", 5) or 5)
+        allow_delay = bool(tm.get("allow_delay_timer", True))
+        max_delays = int(tm.get("max_delay_times", 3) or 3)
+        delays_used = getattr(self.timer_engine, "delays_used", 0)
+        can_postpone = allow_delay and (delays_used < max_delays)
+
         lang = str(self.config_mgr.get("general", "language", default="en"))
         b_str = str(break_type or "short_break")
+        rem = max(1, int(remaining_sec))
         if lang == "ar":
             if b_str == "blink_20_20":
-                title = f"استراحة 20-20-20 — تبدأ خلال {remaining_sec} ثانية"
-                sub = "استعد لإراحة عينيك لمدة 20 ثانية."
+                title = "استراحة 20-20-20 للعينين"
+                sub = f"تبدأ خلال {rem} ثوانٍ • احفظ عملك"
             elif b_str == "long_break":
-                title = f"استراحة طويلة — تبدأ خلال {remaining_sec} ثانية"
-                sub = "احفظ عملك الآن؛ ستبدأ جلسة راحة العين قريباً."
+                title = "استراحة استرخاء طويلة"
+                sub = f"تبدأ خلال {rem} ثوانٍ • احفظ عملك"
             else:
-                title = f"استراحة قصيرة — تبدأ خلال {remaining_sec} ثانية"
-                sub = "احفظ عملك الآن؛ ستبدأ استراحة قصيرة للعين."
+                title = "استراحة قصيرة للعينين"
+                sub = f"تبدأ خلال {rem} ثوانٍ • احفظ عملك"
         else:
             if b_str == "blink_20_20":
-                title = f"Short Eye Break — Starting in {remaining_sec}s"
-                sub = "20-20-20 micro-break approaching; finish your current action."
+                title = "20-20-20 MICRO BREAK"
+                sub = f"Starting in {rem}s — save your work"
             elif b_str == "long_break":
-                title = f"Long Eye Break — Starting in {remaining_sec}s"
-                sub = "Save your work now; a long eye relaxation break is about to start."
+                title = "LONG REST BREAK"
+                sub = f"Starting in {rem}s — save your work"
             else:
-                title = f"Short Eye Break — Starting in {remaining_sec}s"
-                sub = "Save your work now; an eye relaxation break is about to start."
+                title = "SHORT EYE BREAK"
+                sub = f"Starting in {rem}s — save your work"
         self.desktop_overlays.show_toast(
             title=title,
             subtitle=sub,
             position=pos,
-            duration_sec=float(max(3, min(int(remaining_sec), 10))),
+            duration_sec=float(rem),
+            is_prompt=True,
+            postpone_mins=postpone_mins,
+            can_postpone=can_postpone,
         )
 
     def _on_blink_reminder(self):

@@ -4,8 +4,8 @@
 # http://msdn.microsoft.com/en-us/library/ms646997.aspx
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 1, 1, 0),
-    prodvers=(2, 1, 1, 0),
+    filevers=(3, 0, 0, 0),
+    prodvers=(3, 0, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -20,12 +20,12 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'EyeGuard Open Source'),
         StringStruct('FileDescription', 'EyeGuard - Desktop E-Reader & Eye Care Suite'),
-        StringStruct('FileVersion', '2.1.1.0'),
+        StringStruct('FileVersion', '3.0.0.0'),
         StringStruct('InternalName', 'EyeGuard'),
         StringStruct('LegalCopyright', 'Copyright (c) 2026 @hocine_chero. MIT License.'),
         StringStruct('OriginalFilename', 'EyeGuard.exe'),
         StringStruct('ProductName', 'EyeGuard'),
-        StringStruct('ProductVersion', '2.1.1.0')])
+        StringStruct('ProductVersion', '3.0.0.0')])
       ]), 
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

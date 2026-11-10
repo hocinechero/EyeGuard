@@ -1224,7 +1224,7 @@
 
         .break-modes-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 8px;
             margin-bottom: 10px;
         }
@@ -2412,6 +2412,12 @@
                         <h4 id="bm-gentle-title">Gentle break</h4>
                         <p id="bm-gentle-desc">Notification only</p>
                     </div>
+                    <div class="break-mode-card" id="bmode-windowed" onclick="selectBreakMode('windowed')">
+                        <div class="mode-check-badge">✓</div>
+                        <div class="mode-icon-box">🔲</div>
+                        <h4 id="bm-window-title">Centered card</h4>
+                        <p id="bm-window-desc">Covers 40–50% • Skippable</p>
+                    </div>
                     <div class="break-mode-card active" id="bmode-fullscreen" onclick="selectBreakMode('fullscreen')">
                         <div class="mode-check-badge">✓</div>
                         <div class="mode-icon-box">🖥️</div>
@@ -2927,7 +2933,7 @@
                         </div>
 
                         <div class="form-row">
-                            <span class="form-label">Allow delay the timer</span>
+                            <span class="form-label" id="lbl-tm-allow-delay">Allow delay the timer</span>
                             <div class="form-control-area">
                                 <input type="checkbox" id="opt-tm-allow-delay" checked onchange="saveTimerOptionsSubtab()">
                                 <select class="care-select" id="opt-tm-delay-times" onchange="saveTimerOptionsSubtab()">
@@ -2936,7 +2942,21 @@
                                     <option value="3" selected>3</option>
                                     <option value="5">5</option>
                                 </select>
-                                <span style="font-size:11px; color:var(--text-secondary);">times</span>
+                                <span style="font-size:11px; color:var(--text-secondary);" id="lbl-tm-delay-times-unit">times</span>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <span class="form-label" id="lbl-tm-postpone-mins">Postpone duration</span>
+                            <div class="form-control-area">
+                                <select class="care-select" id="opt-tm-postpone-mins" onchange="saveTimerOptionsSubtab()">
+                                    <option value="1">1</option>
+                                    <option value="3">3</option>
+                                    <option value="5" selected>5</option>
+                                    <option value="10">10</option>
+                                    <option value="15">15</option>
+                                </select>
+                                <span style="font-size:11px; color:var(--text-secondary);" id="lbl-tm-postpone-mins-unit">min</span>
                             </div>
                         </div>
 
@@ -3246,7 +3266,7 @@
                     </div>
                     <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">EyeGuard</h2>
                     <p style="font-size:12px; color:var(--accent-teal); font-weight:600; margin-bottom:8px;">
-                        v2.1.1 &bull; Open Source Desktop E-Reader & Eye Care Suite &bull; by @hocine_chero
+                        v3.0.0 &bull; Open Source Desktop E-Reader & Eye Care Suite &bull; by @hocine_chero
                     </p>
                     <p style="font-size: 11px; color:var(--text-secondary); max-width:480px; margin:0 auto 12px auto; line-height: 1.5;">
                         Developed and optimized over days of intensive engineering using advanced AI workflows and specialized side tools (including REA systems and Win32 forensic analysis) by <b>@hocine_chero</b>.
@@ -3456,7 +3476,19 @@
                 kMinExt: "1000 K (Deep Ruby Red)",
                 kMaxExt: "6500 K (Original Screen)",
                 kMinStd: "1900 K (Candlelight)",
-                kMaxStd: "6500 K (Original Screen)"
+                kMaxStd: "6500 K (Original Screen)",
+                lblTmAllowDelay: "السماح بتأجيل المؤقت",
+                lblTmDelayTimesUnit: "مرات",
+                lblTmPostponeMins: "مدة تأجيل الاستراحة",
+                lblTmPostponeMinsUnit: "دقائق",
+                bmGentleTitle: "إشعار خفيف",
+                bmGentleDesc: "إشعار عابر فقط",
+                bmWindowTitle: "استراحة البطاقة",
+                bmWindowDesc: "تغطي 40–50% • قابلة للتخطي",
+                bmFullTitle: "ملء الشاشة",
+                bmFullDesc: "شاشة كاملة • قابلة للتخطي",
+                bmStrictTitle: "قفل صارم",
+                bmStrictDesc: "شاشة كاملة • بدون تخطي"
             },
             en: {
                 sbSubtitle: "by @hocine_chero",
@@ -3549,7 +3581,19 @@
                 kMinExt: "1000 K (Deep Ruby Red)",
                 kMaxExt: "6500 K (Original Screen)",
                 kMinStd: "1900 K (Candlelight)",
-                kMaxStd: "6500 K (Original Screen)"
+                kMaxStd: "6500 K (Original Screen)",
+                lblTmAllowDelay: "Allow delay the timer",
+                lblTmDelayTimesUnit: "times",
+                lblTmPostponeMins: "Postpone duration",
+                lblTmPostponeMinsUnit: "min",
+                bmGentleTitle: "Gentle break",
+                bmGentleDesc: "Notification only",
+                bmWindowTitle: "Centered card",
+                bmWindowDesc: "Covers 40–50% • Skippable",
+                bmFullTitle: "Fullscreen break",
+                bmFullDesc: "Skippable break",
+                bmStrictTitle: "Strict break",
+                bmStrictDesc: "Cannot be skipped"
             }
         };
 
@@ -3941,6 +3985,14 @@
             setTxt('btn-timer-reset', d.btnTimerReset);
             setTxt('btn-timer-break', d.btnTimerBreak);
             setTxt('lbl-ergonomics-header', d.ergonomicsHeader);
+            setTxt('bm-gentle-title', d.bmGentleTitle);
+            setTxt('bm-gentle-desc', d.bmGentleDesc);
+            setTxt('bm-window-title', d.bmWindowTitle);
+            setTxt('bm-window-desc', d.bmWindowDesc);
+            setTxt('bm-full-title', d.bmFullTitle);
+            setTxt('bm-full-desc', d.bmFullDesc);
+            setTxt('bm-strict-title', d.bmStrictTitle);
+            setTxt('bm-strict-desc', d.bmStrictDesc);
             setTxt('t-20-title', d.t20Title);
             setTxt('t-20-desc', d.t20Desc);
             setTxt('t-idle-title', d.tIdleTitle);
@@ -3977,6 +4029,10 @@
 
             setTxt('btn-break-skip', d.btnBreakSkip);
             setTxt('btn-break-postpone', d.btnBreakPostpone);
+            setTxt('lbl-tm-allow-delay', d.lblTmAllowDelay);
+            setTxt('lbl-tm-delay-times-unit', d.lblTmDelayTimesUnit);
+            setTxt('lbl-tm-postpone-mins', d.lblTmPostponeMins);
+            setTxt('lbl-tm-postpone-mins-unit', d.lblTmPostponeMinsUnit);
 
             if (extUnlocked) {
                 setTxt('lbl-min-k', d.kMinExt);
@@ -4724,10 +4780,11 @@
 
         async function selectBreakMode(mode, fromPoll = false) {
             const m = String(mode || 'fullscreen').toLowerCase();
-            ['gentle', 'fullscreen', 'strict'].forEach(k => {
+            ['gentle', 'windowed', 'fullscreen', 'strict'].forEach(k => {
                 const el = document.getElementById(`bmode-${k}`);
                 if (el) el.classList.toggle('active', k === m);
             });
+            currentBreakMode = m;
             if (!fromPoll && window.pywebview && window.pywebview.api && window.pywebview.api.set_break_mode) {
                 try {
                     await window.pywebview.api.set_break_mode(m);
@@ -5292,15 +5349,49 @@
             const meta = breakMeta || {};
             const mode = modeOverride || meta.mode || currentBreakMode || 'fullscreen';
 
-            // Position the break windowlet card strictly on the primary monitor center
+            // Position and styling for break modal
             const modalCard = overlay.querySelector('.break-modal-glass');
-            if (modalCard) {
-                const cxPct = (typeof meta.primary_center_x_pct === 'number') ? meta.primary_center_x_pct : 50;
-                const cyPct = (typeof meta.primary_center_y_pct === 'number') ? meta.primary_center_y_pct : 50;
-                modalCard.style.position = 'fixed';
-                modalCard.style.left = `${cxPct}%`;
-                modalCard.style.top = `${cyPct}%`;
-                modalCard.style.transform = 'translate(-50%, -50%)';
+            if (mode === 'windowed') {
+                overlay.style.background = 'radial-gradient(ellipse at 50% 20%, #151e26 0%, #0c1117 100%)';
+                overlay.style.backdropFilter = 'none';
+                overlay.style.border = '1px solid rgba(20, 184, 166, 0.4)';
+                overlay.style.boxShadow = '0 24px 64px rgba(0,0,0,0.85)';
+                if (modalCard) {
+                    modalCard.style.position = 'relative';
+                    modalCard.style.left = 'auto';
+                    modalCard.style.top = 'auto';
+                    modalCard.style.transform = 'none';
+                    modalCard.style.background = 'transparent';
+                    modalCard.style.border = 'none';
+                    modalCard.style.boxShadow = 'none';
+                    modalCard.style.maxWidth = '100%';
+                    modalCard.style.width = '100%';
+                }
+            } else {
+                overlay.style.border = 'none';
+                overlay.style.boxShadow = 'none';
+                if (modalCard) {
+                    const cxPct = (typeof meta.primary_center_x_pct === 'number') ? meta.primary_center_x_pct : 50;
+                    const cyPct = (typeof meta.primary_center_y_pct === 'number') ? meta.primary_center_y_pct : 50;
+                    modalCard.style.position = 'fixed';
+                    modalCard.style.left = `${cxPct}%`;
+                    modalCard.style.top = `${cyPct}%`;
+                    modalCard.style.transform = 'translate(-50%, -50%)';
+                    modalCard.style.background = 'rgba(19, 22, 26, 0.92)';
+                    modalCard.style.border = '1px solid var(--border-default)';
+                    modalCard.style.boxShadow = '0 20px 52px rgba(0, 0, 0, 0.7)';
+                    modalCard.style.maxWidth = '450px';
+                    modalCard.style.width = '90%';
+                }
+                // Apply Custom Wallpaper or Random Nature Gradient
+                if (meta.custom_wallpaper) {
+                    overlay.style.backgroundImage = `linear-gradient(rgba(6,18,24,0.65), rgba(6,18,24,0.82)), url("${meta.custom_wallpaper}")`;
+                    overlay.style.backgroundSize = 'cover';
+                    overlay.style.backgroundPosition = 'center';
+                } else if (meta.random_wallpaper !== false) {
+                    const idx = Math.floor(Math.random() * NATURE_WALLPAPER_GRADIENTS.length);
+                    overlay.style.background = NATURE_WALLPAPER_GRADIENTS[idx];
+                }
             }
 
             // Apply transparency & fade speed
@@ -5309,16 +5400,6 @@
             const fadeMode = meta.fade || (document.getElementById('opt-brk-fade') ? document.getElementById('opt-brk-fade').value : 'fast') || 'fast';
             const fadeDur = fadeMode === 'slow' ? '1.1s' : (fadeMode === 'normal' ? '0.6s' : '0.25s');
             overlay.style.transition = `opacity ${fadeDur} ease`;
-
-            // Apply Custom Wallpaper or Random Nature Gradient
-            if (meta.custom_wallpaper) {
-                overlay.style.backgroundImage = `linear-gradient(rgba(6,18,24,0.65), rgba(6,18,24,0.82)), url("${meta.custom_wallpaper}")`;
-                overlay.style.backgroundSize = 'cover';
-                overlay.style.backgroundPosition = 'center';
-            } else if (meta.random_wallpaper !== false) {
-                const idx = Math.floor(Math.random() * NATURE_WALLPAPER_GRADIENTS.length);
-                overlay.style.background = NATURE_WALLPAPER_GRADIENTS[idx];
-            }
 
             // Password protection & postpone availability
             const usePwd = !!meta.use_password || (document.getElementById('opt-end-pwd') && document.getElementById('opt-end-pwd').checked);
@@ -5608,6 +5689,7 @@
                 pre_break_prompt_sec: parseInt(document.getElementById('opt-tm-preprompt').value) || 10,
                 allow_delay_timer: document.getElementById('opt-tm-allow-delay').checked,
                 max_delay_times: parseInt(document.getElementById('opt-tm-delay-times').value) || 3,
+                postpone_minutes: parseInt(document.getElementById('opt-tm-postpone-mins').value) || 5,
                 auto_pause_on_idle: document.getElementById('opt-tm-pause-idle').checked,
                 idle_threshold_seconds: (parseInt(document.getElementById('opt-tm-pause-mins').value) || 3) * 60,
                 restart_on_idle: document.getElementById('opt-tm-restart-idle').checked,
@@ -5755,7 +5837,7 @@
                     if (msgEl && res) msgEl.innerText = res.message || 'You are using the latest version.';
                 }
             } catch (e) {
-                if (msgEl) msgEl.innerText = 'You are using the latest stable release (v2.1.1).';
+                if (msgEl) msgEl.innerText = 'You are using the latest stable release (v3.0.0).';
             }
         }
 
@@ -5816,6 +5898,7 @@
                             if (t.pre_break_prompt_sec) document.getElementById('opt-tm-preprompt').value = String(t.pre_break_prompt_sec);
                             document.getElementById('opt-tm-allow-delay').checked = t.allow_delay_timer !== false;
                             if (t.max_delay_times) document.getElementById('opt-tm-delay-times').value = String(t.max_delay_times);
+                            if (t.postpone_minutes) document.getElementById('opt-tm-postpone-mins').value = String(t.postpone_minutes);
                             document.getElementById('opt-tm-pause-idle').checked = t.auto_pause_on_idle !== false;
                             if (t.idle_threshold_seconds) document.getElementById('opt-tm-pause-mins').value = String(Math.max(1, Math.round(t.idle_threshold_seconds / 60)));
                             document.getElementById('opt-tm-restart-idle').checked = t.restart_on_idle !== false;

@@ -20,6 +20,16 @@ def kill_running():
     print("Terminating running EyeGuard processes...")
     subprocess.run("taskkill /F /IM EyeGuard* /T", shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     time.sleep(1)
+    # Safely clear orphaned WebView2 lock files to prevent dark empty windows
+    wv_dir = os.path.expandvars(r"%LOCALAPPDATA%\EyeGuardWebview\EBWebView")
+    if os.path.isdir(wv_dir):
+        for root, _, files in os.walk(wv_dir):
+            for file in files:
+                if file.upper() in ("LOCK", "LOCKFILE"):
+                    try:
+                        os.remove(os.path.join(root, file))
+                    except Exception:
+                        pass
 
 def sha256_of(path):
     h = hashlib.sha256()

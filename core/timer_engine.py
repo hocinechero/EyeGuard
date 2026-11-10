@@ -245,6 +245,16 @@ class BreakTimerEngine:
                 self._pre_blink_prompt_fired = False
                 if self.on_break_end:
                     callbacks.append(self.on_break_end)
+            elif self.state == TimerState.WORKING:
+                # Pre-break prompt skip: reset countdown to a fresh work session
+                self.work_remaining_sec = self.work_duration
+                self.blink_counter_sec = self._blink_interval
+                self.delays_used = 0
+                self._pre_prompt_fired = False
+                self._pre_prompt_10s_fired = False
+                self._pre_blink_prompt_fired = False
+                if self.on_break_end:
+                    callbacks.append(self.on_break_end)
 
         for cb in callbacks:
             try:

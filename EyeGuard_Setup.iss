@@ -2,7 +2,7 @@
 ; Author: @hocine_chero
 
 #define MyAppName "EyeGuard"
-#define MyAppVersion "2.1.1"
+#define MyAppVersion "3.0.0"
 #define MyAppPublisher "@hocine_chero"
 #define MyAppExeName "EyeGuard.exe"
 
@@ -11,13 +11,13 @@ AppId={{D37E88BC-89B4-4B2D-A491-17C17483B892}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-VersionInfoVersion=2.1.1.0
+VersionInfoVersion=3.0.0.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=EyeGuard Setup
-VersionInfoTextVersion=2.1.1
+VersionInfoTextVersion=3.0.0
 VersionInfoCopyright=Copyright (c) 2026 @hocine_chero. MIT License.
 VersionInfoProductName=EyeGuard
-VersionInfoProductVersion=2.1.1.0
+VersionInfoProductVersion=3.0.0.0
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
