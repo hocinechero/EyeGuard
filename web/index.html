@@ -3269,7 +3269,7 @@
                         v3.0.0 &bull; Open Source Desktop E-Reader & Eye Care Suite &bull; by @hocine_chero
                     </p>
                     <p style="font-size: 11px; color:var(--text-secondary); max-width:480px; margin:0 auto 12px auto; line-height: 1.5;">
-                        Developed and optimized over days of intensive engineering using advanced AI workflows and specialized side tools (including REA systems and Win32 forensic analysis) by <b>@hocine_chero</b>.
+                        Free, offline, and open-source desktop eye comfort & reading suite for Windows by <b>@hocine_chero</b>.
                     </p>
                     <!-- Community, Feedback & Official Links -->
                     <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:14px;">
@@ -3291,47 +3291,6 @@
                         <button class="btn-linear btn-linear-secondary" onclick="resetPresetsToDefault()">Factory Reset Presets</button>
                     </div>
 
-                    <!-- Support & Donations Card -->
-                    <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px; max-width: 500px; margin: 12px auto 0 auto; text-align: left;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                                <span>💖 Support & Donations</span>
-                            </div>
-                            <span style="font-size: 10px; color: var(--accent-teal); font-weight: 600; background: rgba(14, 165, 233, 0.12); padding: 2px 8px; border-radius: 999px;">100% Free & Open Source</span>
-                        </div>
-                        
-                        <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
-                            EyeGuard is maintained by <b>@hocine_chero</b>. If it helped protect your vision, consider supporting development via Crypto or platforms:
-                        </p>
-
-                        <!-- Crypto addresses -->
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 6px 10px;">
-                                <div style="display: flex; flex-direction: column; overflow: hidden; margin-right: 8px;">
-                                    <span style="font-size: 10px; font-weight: 700; color: #f59e0b;">Bitcoin (BTC)</span>
-                                    <span style="font-size: 10px; font-family: monospace; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="addr-btc">13APFJgRd8ZpS5aKSyhY7sdM4XZKABoKcN</span>
-                                </div>
-                                <button class="btn-linear btn-linear-secondary" style="padding: 3px 8px; font-size: 10px; flex-shrink: 0;" onclick="copyDonationAddr('13APFJgRd8ZpS5aKSyhY7sdM4XZKABoKcN', this)">Copy</button>
-                            </div>
-
-                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 6px 10px;">
-                                <div style="display: flex; flex-direction: column; overflow: hidden; margin-right: 8px;">
-                                    <span style="font-size: 10px; font-weight: 700; color: #60a5fa;">Ethereum (ETH - ERC20)</span>
-                                    <span style="font-size: 10px; font-family: monospace; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="addr-eth">0x768f8c9639c65ca5f19d5e29b7bf487b831cdd66</span>
-                                </div>
-                                <button class="btn-linear btn-linear-secondary" style="padding: 3px 8px; font-size: 10px; flex-shrink: 0;" onclick="copyDonationAddr('0x768f8c9639c65ca5f19d5e29b7bf487b831cdd66', this)">Copy</button>
-                            </div>
-
-                            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 6px 10px;">
-                                <div style="display: flex; flex-direction: column; overflow: hidden; margin-right: 8px;">
-                                    <span style="font-size: 10px; font-weight: 700; color: #34d399;">Tether (USDT - ERC20)</span>
-                                    <span style="font-size: 10px; font-family: monospace; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="addr-usdt">0x768f8c9639c65ca5f19d5e29b7bf487b831cdd66</span>
-                                </div>
-                                <button class="btn-linear btn-linear-secondary" style="padding: 3px 8px; font-size: 10px; flex-shrink: 0;" onclick="copyDonationAddr('0x768f8c9639c65ca5f19d5e29b7bf487b831cdd66', this)">Copy</button>
-                            </div>
-                        </div>
-
-
                     </div>
                 </div>
             </div>
@@ -3344,28 +3303,6 @@
                 window.pywebview.api.open_url(url);
             } else {
                 window.open(url, '_blank');
-            }
-        }
-
-        function copyDonationAddr(text, btn) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => {
-                    const orig = btn.innerText;
-                    btn.innerText = 'Copied! ✓';
-                    btn.style.color = '#10b981';
-                    setTimeout(() => { btn.innerText = orig; btn.style.color = ''; }, 2000);
-                });
-            } else {
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                const orig = btn.innerText;
-                btn.innerText = 'Copied! ✓';
-                btn.style.color = '#10b981';
-                setTimeout(() => { btn.innerText = orig; btn.style.color = ''; }, 2000);
             }
         }
 
