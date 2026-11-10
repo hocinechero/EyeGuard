@@ -1286,7 +1286,6 @@ class EyeGuardApp:
     def preview_break_mode(self):
         mode = self.timer_engine.break_mode
         if mode == "gentle":
-            self._on_blink_reminder()
             self.tray_mgr.notify(
                 "EyeGuard — Gentle Break Preview",
                 "Gentle notification without locking the screen: take a deep breath and rest your eyes.",
