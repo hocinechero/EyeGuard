@@ -594,37 +594,61 @@ class EyeGuardApp:
         except Exception:
             pass
 
-    def _exit_fullscreen_kiosk_mode(self):
+    def _exit_fullscreen_kiosk_mode(self, is_preview: bool = False):
         hwnd = self._get_main_hwnd()
+        was_hidden = getattr(self, "_was_hidden_before_break", True)
+        is_preview = is_preview or getattr(self, "_was_break_preview", False)
+        should_stay_visible = is_preview or not was_hidden
+
         try:
             if hwnd and self._saved_win_rect:
                 x, y, w, h = self._saved_win_rect
                 style = self._saved_win_style or 0x10CF0000  # WS_OVERLAPPEDWINDOW
                 user32.SetLayeredWindowAttributes(hwnd, 0, 255, 2)
                 user32.SetWindowLongW(hwnd, -16, style)
-                user32.SetWindowPos(
-                    hwnd,
-                    ctypes.c_void_p(-2),  # HWND_NOTOPMOST
-                    x,
-                    y,
-                    max(700, w),
-                    max(480, h),
-                    0x0080 | 0x0020,  # SWP_HIDEWINDOW | SWP_FRAMECHANGED
-                )
+
+                if should_stay_visible:
+                    # Keep window open at its previous coordinates
+                    user32.SetWindowPos(
+                        hwnd,
+                        ctypes.c_void_p(-2),  # HWND_NOTOPMOST
+                        x,
+                        y,
+                        max(700, w),
+                        max(480, h),
+                        0x0040 | 0x0020,  # SWP_SHOWWINDOW | SWP_FRAMECHANGED
+                    )
+                else:
+                    # Hide window back to system tray
+                    user32.SetWindowPos(
+                        hwnd,
+                        ctypes.c_void_p(-2),  # HWND_NOTOPMOST
+                        x,
+                        y,
+                        max(700, w),
+                        max(480, h),
+                        0x0080 | 0x0020,  # SWP_HIDEWINDOW | SWP_FRAMECHANGED
+                    )
             self._saved_win_rect = None
 
-            # Always hide window after break exit so the user is never dumped into the app
-            self._was_hidden_before_break = False
-            self.hide_window()
+            if should_stay_visible:
+                self._is_window_hidden = False
+                self._was_hidden_before_break = False
+                self._was_break_preview = False
+                self.show_window()
+            else:
+                self._was_hidden_before_break = False
+                self._was_break_preview = False
+                self.hide_window()
 
-            # Restore focus to previous foreground window
-            prev_h = getattr(self, "_prev_foreground_hwnd", None)
-            self._prev_foreground_hwnd = None
-            if prev_h and user32.IsWindow(prev_h):
-                try:
-                    force_foreground_window(prev_h)
-                except Exception:
-                    pass
+                # Restore focus to previous foreground window
+                prev_h = getattr(self, "_prev_foreground_hwnd", None)
+                self._prev_foreground_hwnd = None
+                if prev_h and user32.IsWindow(prev_h):
+                    try:
+                        force_foreground_window(prev_h)
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -1170,6 +1194,9 @@ class EyeGuardApp:
                 else 0,
             }
 
+            if getattr(self, "_was_break_preview", False):
+                self._active_break["is_preview"] = True
+
             if tm_cfg.get("play_music_during_break", False):
                 self.audio_player.start_break_music(str(tm_cfg.get("break_music_path", "")))
 
@@ -1195,10 +1222,11 @@ class EyeGuardApp:
 
     def _on_break_end(self):
         last_break = self._active_break
+        is_prev = bool(last_break and last_break.get("is_preview")) or getattr(self, "_was_break_preview", False)
         self._active_break = None
         self.audio_player.stop_break_music()
         if not _is_running_unit_tests():
-            self._exit_fullscreen_kiosk_mode()
+            self._exit_fullscreen_kiosk_mode(is_preview=is_prev)
 
         tm_cfg = self.config_mgr.get("timer", default={}) or {}
 
@@ -1247,6 +1275,7 @@ class EyeGuardApp:
                 "Gentle notification without locking the screen: take a deep breath and rest your eyes.",
             )
         else:
+            self._was_break_preview = True
             self.take_break_now("short_break", duration_sec=15)
             if self._active_break:
                 self._active_break["is_preview"] = True
@@ -1262,16 +1291,18 @@ class EyeGuardApp:
             saved_pwd = str(tm_cfg.get("break_password", "")).strip()
             if saved_pwd and str(password_attempt or "").strip() != saved_pwd:
                 return {"ok": False, "error": "invalid_password", "reason": "invalid_password"}
+        is_prev = bool(self._active_break and self._active_break.get("is_preview")) or getattr(self, "_was_break_preview", False)
         self._active_break = None
         self.timer_engine.skip_break()
-        self._exit_fullscreen_kiosk_mode()
+        self._exit_fullscreen_kiosk_mode(is_preview=is_prev)
         return {"ok": True}
 
     def postpone_break(self, minutes: int = 5) -> dict:
+        is_prev = bool(self._active_break and self._active_break.get("is_preview")) or getattr(self, "_was_break_preview", False)
         ok = self.timer_engine.postpone_break(int(minutes))
         if ok:
             self._active_break = None
-            self._exit_fullscreen_kiosk_mode()
+            self._exit_fullscreen_kiosk_mode(is_preview=is_prev)
         return {
             "ok": ok,
             "delays_remaining": max(
