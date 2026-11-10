@@ -79,7 +79,7 @@ class BreakTimerEngine:
         self.enabled = bool(enabled)
         self.break_mode = (
             str(break_mode)
-            if break_mode in ("gentle", "fullscreen", "strict")
+            if break_mode in ("gentle", "windowed", "fullscreen", "strict")
             else "fullscreen"
         )
         self.blink_reminder = bool(blink_reminder)
@@ -388,7 +388,7 @@ class BreakTimerEngine:
                 self.idle_detector.threshold = self.idle_threshold_sec
             if enabled is not None:
                 self.set_enabled(bool(enabled))
-            if break_mode in ("gentle", "fullscreen", "strict"):
+            if break_mode in ("gentle", "windowed", "fullscreen", "strict"):
                 self.break_mode = str(break_mode)
             if blink_reminder is not None:
                 self.blink_reminder = bool(blink_reminder)
@@ -565,7 +565,7 @@ class BreakTimerEngine:
                     # Pre-break prompt notification (for fullscreen / strict Pomodoro breaks)
                     if (
                         self.enable_pomodoro
-                        and self.break_mode in ("fullscreen", "strict")
+                        and self.break_mode in ("windowed", "fullscreen", "strict")
                         and 0 < self.work_remaining_sec <= self.pre_break_prompt_sec
                         and not self._pre_prompt_fired
                     ):
@@ -581,7 +581,7 @@ class BreakTimerEngine:
                             )
                     elif (
                         self.enable_pomodoro
-                        and self.break_mode in ("fullscreen", "strict")
+                        and self.break_mode in ("windowed", "fullscreen", "strict")
                         and self.pre_break_prompt_sec > 10
                         and 0 < self.work_remaining_sec <= 10
                         and not self._pre_prompt_10s_fired
@@ -599,7 +599,7 @@ class BreakTimerEngine:
                     blink_prompt_lead = min(10, self.pre_break_prompt_sec)
                     if (
                         self.enable_20_20
-                        and self.break_mode in ("fullscreen", "strict")
+                        and self.break_mode in ("windowed", "fullscreen", "strict")
                         and 0 < self.blink_counter_sec <= blink_prompt_lead
                         and not self._pre_blink_prompt_fired
                         and (not self.enable_pomodoro or self.work_remaining_sec > blink_prompt_lead)

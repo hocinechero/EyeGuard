@@ -345,6 +345,7 @@ class EyeGuardApp:
         self._prev_foreground_hwnd = None
         self._saved_win_rect = None
         self._saved_win_style = None
+        self._saved_win_ex_style = None
 
         # Connect Timer Engine Callbacks
         self.timer_engine.on_break_trigger = self._on_break_trigger
@@ -557,7 +558,7 @@ class EyeGuardApp:
             pass
         return (50.0, 50.0)
 
-    def _enter_fullscreen_kiosk_mode(self, transparency_pct: int = 100):
+    def _enter_fullscreen_kiosk_mode(self, transparency_pct: int = 100, mode: str = "fullscreen"):
         hwnd = self._get_main_hwnd()
         if not hwnd:
             return
@@ -566,28 +567,38 @@ class EyeGuardApp:
             user32.GetWindowRect(hwnd, ctypes.byref(rc))
             self._saved_win_rect = (rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top)
             self._saved_win_style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
+            self._saved_win_ex_style = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
 
             # Multi-monitor bounds strictly for break fullscreen
             vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
             vy = user32.GetSystemMetrics(77)  # SM_YVIRTUALSCREEN
             vw = user32.GetSystemMetrics(78)  # SM_CXVIRTUALSCREEN
             vh = user32.GetSystemMetrics(79)  # SM_CYVIRTUALSCREEN
+            pw = user32.GetSystemMetrics(0)   # SM_CXSCREEN (Primary monitor width)
+            ph = user32.GetSystemMetrics(1)   # SM_CYSCREEN (Primary monitor height)
             if vw <= 0 or vh <= 0:
                 vx, vy = 0, 0
-                vw = user32.GetSystemMetrics(0)
-                vh = user32.GetSystemMetrics(1)
+                vw = pw if pw > 0 else 1920
+                vh = ph if ph > 0 else 1080
+
+            if mode == "windowed":
+                # Windowed card mode covers 45-50% of the active/primary display centered
+                disp_w = pw if pw > 0 else vw
+                disp_h = ph if ph > 0 else vh
+                target_w = max(580, int(disp_w * 0.46))
+                target_h = max(460, int(disp_h * 0.52))
+                target_x = max(0, (disp_w - target_w) // 2)
+                target_y = max(0, (disp_h - target_h) // 2)
+            else:
+                target_x, target_y = vx, vy
+                target_w, target_h = vw, vh
 
             # WS_POPUP | WS_VISIBLE = 0x90000000
             user32.SetWindowLongW(hwnd, -16, 0x90000000)
-            if transparency_pct < 100:
-                ex = user32.GetWindowLongW(hwnd, -20)
-                user32.SetWindowLongW(hwnd, -20, ex | 0x00080000)  # WS_EX_LAYERED
-                alpha = max(140, min(255, int(255 * (transparency_pct / 100.0))))
-                user32.SetLayeredWindowAttributes(hwnd, 0, alpha, 2)
             user32.SetWindowPos(
                 hwnd,
                 ctypes.c_void_p(-1),  # HWND_TOPMOST
-                vx, vy, vw, vh,
+                target_x, target_y, target_w, target_h,
                 0x0020 | 0x0040  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
             )
             force_foreground_window(hwnd)
@@ -604,7 +615,9 @@ class EyeGuardApp:
             if hwnd and self._saved_win_rect:
                 x, y, w, h = self._saved_win_rect
                 style = self._saved_win_style or 0x10CF0000  # WS_OVERLAPPEDWINDOW
-                user32.SetLayeredWindowAttributes(hwnd, 0, 255, 2)
+                ex_style = getattr(self, "_saved_win_ex_style", None)
+                if ex_style is not None:
+                    user32.SetWindowLongW(hwnd, -20, ex_style)
                 user32.SetWindowLongW(hwnd, -16, style)
 
                 if should_stay_visible:
@@ -630,6 +643,8 @@ class EyeGuardApp:
                         0x0080 | 0x0020,  # SWP_HIDEWINDOW | SWP_FRAMECHANGED
                     )
             self._saved_win_rect = None
+            self._saved_win_style = None
+            self._saved_win_ex_style = None
 
             if should_stay_visible:
                 self._is_window_hidden = False
@@ -1212,11 +1227,13 @@ class EyeGuardApp:
             main_h = self._get_main_hwnd()
             if main_h:
                 force_foreground_window(main_h)
+            brk_mode = self.timer_engine.break_mode
             if not _is_running_unit_tests():
                 threading.Timer(
                     0.05,
                     lambda: self._enter_fullscreen_kiosk_mode(
-                        int(tm_cfg.get("lock_screen_transparency", 100))
+                        int(tm_cfg.get("lock_screen_transparency", 100)),
+                        mode=brk_mode,
                     ),
                 ).start()
 
