@@ -176,7 +176,7 @@ def force_foreground_window(hwnd: int):
 
 
 class EyeGuardApp:
-    VERSION = "2.1.1"
+    VERSION = "3.0.0"
 
     def __init__(self):
         # 1. Config & Dynamic LocalAppData Storage
