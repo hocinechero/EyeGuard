@@ -8,10 +8,15 @@ __pycache__/
 *$py.class
 *.pyd
 
-# PyInstaller build artifacts & distribution binaries
+# Build artifacts & distribution binaries
 # (Binaries should be published via GitHub Releases, not checked into git)
 build/
 dist/
+dist_nuitka/
+dist_nuitka_onefile/
+*.build/
+*.dist/
+*.onefile-build/
 
 # Scratch & development experiments
 scratch/
