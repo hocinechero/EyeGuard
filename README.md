@@ -34,7 +34,7 @@ winget install hocinechero.EyeGuard
 
 | Package | Description | Direct Download |
 | :--- | :--- | :---: |
-| ⚡ **EyeGuard Portable** | **No installation required.** Single standalone executable. Run from desktop or USB drive. | [📥 **Download EyeGuard_Portable.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.exe) |
+| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.zip) |
 | 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Setup.exe) |
 | 🪟 **Winget Package** | Official Windows Package Manager distribution. Automatically tracked and updated. | `winget install hocinechero.EyeGuard` |
 
