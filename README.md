@@ -12,8 +12,11 @@
 </p>
 
 <p align="center">
+  <a href="https://hocinechero.github.io/EyeGuard/"><img src="https://img.shields.io/badge/Website-EyeGuard-14b8a6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Official Website"></a>
   <a href="https://github.com/hocinechero/EyeGuard/releases"><img src="https://img.shields.io/badge/Release-v3.0.0-14b8a6?style=for-the-badge&logo=github" alt="Release v3.0.0"></a>
-  <a href="https://github.com/microsoft/winget-pkgs/pull/471894"><img src="https://img.shields.io/badge/Winget-hocinechero.EyeGuard-0078d4?style=for-the-badge&logo=windows-terminal&logoColor=white" alt="Winget Available"></a>
+  <a href="https://github.com/microsoft/winget-pkgs/pull/478905"><img src="https://img.shields.io/badge/Winget-hocinechero.EyeGuard-0078d4?style=for-the-badge&logo=windows-terminal&logoColor=white" alt="Winget Available"></a>
+  <a href="https://www.virustotal.com/gui/file/88eb7509826c64ce164159e0e1cb84202cec6ad9ae6dae394f7e4366f9a57c93"><img src="https://img.shields.io/badge/VirusTotal-0%2F66%20Clean-10b981?style=for-the-badge&logo=virustotal&logoColor=white" alt="VirusTotal 0/66 Clean"></a>
+  <a href="https://alternativeto.net/software/eyeguard/"><img src="https://img.shields.io/badge/AlternativeTo-EyeGuard-1e88e5?style=for-the-badge" alt="AlternativeTo Listing"></a>
   <a href="https://github.com/hocinechero/EyeGuard"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0ea5e9?style=for-the-badge&logo=windows" alt="Windows 10 / 11"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-teal?style=for-the-badge" alt="MIT License"></a>
   <a href="https://github.com/hocinechero/EyeGuard"><img src="https://img.shields.io/badge/Telemetry-Zero%20Network%20Calls-blueviolet?style=for-the-badge" alt="Zero Telemetry"></a>
@@ -27,16 +30,18 @@
 
 ### 🚀 Instant Downloads & Installation (Version 3.0.0)
 
+🌐 **Official Website:** **[hocinechero.github.io/EyeGuard](https://hocinechero.github.io/EyeGuard/)**
+
 ```powershell
 # 1-Command Install via Windows Package Manager
 winget install hocinechero.EyeGuard
 ```
 
-| Package | Description | Direct Download |
-| :--- | :--- | :---: |
-| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.zip) |
-| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Setup.exe) |
-| 🪟 **Winget Package** | Official Windows Package Manager distribution. Automatically tracked and updated. | `winget install hocinechero.EyeGuard` |
+| Package | Description | Direct Download | Security Scan |
+| :--- | :--- | :---: | :---: |
+| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.zip) | [🛡️ **0/66 Clean**](https://www.virustotal.com/gui/file/88eb7509826c64ce164159e0e1cb84202cec6ad9ae6dae394f7e4366f9a57c93) |
+| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Setup.exe) | [🛡️ **70/71 Clean**](https://www.virustotal.com/gui/file/a92a05f6c87fc4015f665b97c54f65abeb1652d21efd61b7d729966342c3e784) |
+| 🪟 **Winget Package** | Official Windows Package Manager distribution. Automatically tracked and updated. | `winget install hocinechero.EyeGuard` | Microsoft Pipeline |
 
 </div>
 
@@ -208,8 +213,15 @@ If EyeGuard relieved your eye strain or made reading on your computer comfortabl
 
 Help fellow readers, students, developers, and researchers discover EyeGuard:
 - ⭐ **Star this repository** on GitHub.
+- 👍 **Like & Recommend on [AlternativeTo](https://alternativeto.net/software/eyeguard/)** to help others find a free open-source alternative to CareUEyes and f.lux.
 - 💬 Share it on **Reddit** (`r/software`, `r/productivity`, `r/windows`, `r/eReader`).
-- 🐦 Share on **X / Twitter**: [Share EyeGuard on X](https://twitter.com/intent/tweet?text=Found%20an%20open-source%20desktop%20e-reader%20and%20reading%20ruler%20for%20Windows%20that%20turns%20any%20PDF%20into%20Kindle%20paper%3A%20https%3A%2F%2Fgithub.com%2Fhocinechero%2FEyeGuard)
+- 🐦 Share on **X / Twitter**: [Share EyeGuard on X](https://twitter.com/intent/tweet?text=Found%20an%20open-source%20desktop%20e-reader%20and%20reading%20ruler%20for%20Windows%20that%20turns%20any%20PDF%20into%20Kindle%20paper%3A%20https%3A%2F%2Fhocinechero.github.io%2FEyeGuard%2F)
+
+<p>
+  <a href="https://alternativeto.net/software/eyeguard/?utm_source=badge&utm_medium=referral">
+    <img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="EyeGuard | AlternativeTo" width="180" />
+  </a>
+</p>
 
 ---
 

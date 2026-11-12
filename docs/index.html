@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EyeGuard — Full-Desktop E-Reader & Eye Care Suite for Windows</title>
+  <meta name="description" content="Transform your entire Windows desktop into a paper-like reading surface. Zero-lag reading ruler, paragraph spotlight, 22 Kindle & e-ink palettes, 1000K-6500K dimming, and 20-20-20 break alerts. 100% free, open-source, zero telemetry." />
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+
+  <!-- Open Graph / Social Previews -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://hocinechero.github.io/EyeGuard/" />
+  <meta property="og:title" content="EyeGuard v3.0.0 — Full-Desktop E-Reader & Eye Care Suite for Windows" />
+  <meta property="og:description" content="Free & open-source MIT alternative to CareUEyes and f.lux. Reading ruler, paragraph spotlight, 22 paper themes, flicker-free dimming, and fail-safe crash recovery." />
+  <meta property="og:image" content="https://hocinechero.github.io/EyeGuard/assets/screenshots/dashboard.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <style>
+    :root {
+      --bg-base: #13161a;
+      --bg-surface: #181b20;
+      --bg-card: #1f242b;
+      --bg-raised: #262c35;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --border-accent: rgba(20, 184, 166, 0.45);
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #14b8a6;
+      --accent-hover: #2dd4bf;
+      --accent-subtle: rgba(20, 184, 166, 0.14);
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      --font-mono: "Cascadia Code", "Consolas", ui-monospace, monospace;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background:
+        radial-gradient(1100px 540px at 50% -120px, rgba(20, 184, 166, 0.14), transparent 70%),
+        var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent-hover);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(12px);
+      background: rgba(19, 22, 26, 0.86);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.125rem;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+    .brand:hover { text-decoration: none; }
+    .brand img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+    .badge-ver {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent-subtle);
+      color: var(--accent-hover);
+      border: 1px solid var(--border-accent);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      font-size: 0.92rem;
+    }
+    .nav-links a {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .nav-links a:hover {
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .nav-cta {
+      background: var(--accent);
+      color: #091315 !important;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      font-weight: 700 !important;
+      font-size: 0.88rem;
+      transition: background 150ms ease;
+    }
+    .nav-cta:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Hero */
+    .hero {
+      padding: 64px 0 44px;
+      text-align: center;
+    }
+
+    .pill-top {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+    }
+    .pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4.4vw, 3.2rem);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      font-weight: 800;
+      max-width: 820px;
+      margin: 0 auto 18px;
+    }
+    h1 span {
+      background: linear-gradient(120deg, #2dd4bf, #38bdf8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-sub {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      max-width: 680px;
+      margin: 0 auto 30px;
+    }
+
+    .cta-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 13px 22px;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      font-size: 0.96rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: transform 120ms ease, background 150ms ease, border-color 150ms ease;
+      text-decoration: none;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #081214;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+    .btn-secondary:hover {
+      background: var(--bg-raised);
+      border-color: var(--border-accent);
+    }
+    .btn-sub {
+      font-size: 0.78rem;
+      font-weight: 500;
+      opacity: 0.82;
+    }
+
+    /* Winget Copy Box */
+    .winget-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--text-primary);
+      margin-bottom: 24px;
+    }
+    .winget-bar code {
+      user-select: all;
+    }
+    .copy-btn {
+      background: var(--bg-raised);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--border-accent);
+    }
+
+    /* Trust Strip */
+    .trust-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px 22px;
+      font-size: 0.86rem;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+    }
+    .trust-strip span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Demo Window */
+    .demo-frame {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 12px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .demo-frame img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+    .demo-caption {
+      margin-top: 12px;
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+    }
+
+    /* Sections */
+    section {
+      padding: 64px 0;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .section-head {
+      text-align: center;
+      max-width: 680px;
+      margin: 0 auto 40px;
+    }
+    .section-head h2 {
+      font-size: clamp(1.55rem, 3vw, 2.2rem);
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .section-head p {
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    /* Cards Grid */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    @media (max-width: 860px) {
+      .grid-3, .grid-2 { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 24px;
+    }
+    .card:hover {
+      border-color: var(--border-accent);
+    }
+    .card-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--accent-hover);
+      background: var(--accent-subtle);
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .card h3 {
+      font-size: 1.12rem;
+      margin-bottom: 8px;
+    }
+    .card p {
+      font-size: 0.94rem;
+      color: var(--text-secondary);
+    }
+
+    /* Interactive Palette Preview */
+    .palette-preview {
+      margin-top: 34px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 24px;
+      align-items: center;
+    }
+    @media (max-width: 860px) {
+      .palette-preview { grid-template-columns: 1fr; }
+    }
+    .swatch-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .swatch-btn {
+      border: 1px solid var(--border-strong);
+      background: var(--bg-raised);
+      color: var(--text-primary);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .swatch-btn.active {
+      border-color: var(--accent-hover);
+      background: var(--accent-subtle);
+      color: var(--accent-hover);
+    }
+    .simulated-page {
+      border-radius: 10px;
+      padding: 22px 24px;
+      border: 1px solid var(--border-strong);
+      transition: background 200ms ease, color 200ms ease;
+    }
+    .simulated-page h4 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+    .simulated-page p {
+      font-size: 0.9rem;
+      line-height: 1.65;
+    }
+
+    /* Screenshot Tabs */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .tab-btn {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      padding: 9px 16px;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: var(--accent-subtle);
+      color: var(--accent-hover);
+      border-color: var(--border-accent);
+    }
+    .shot-viewer {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    .shot-viewer img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    /* Comparison Table */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--bg-card);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 660px;
+      font-size: 0.93rem;
+    }
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    th {
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-weight: 700;
+    }
+    tr:last-child td { border-bottom: none; }
+    .col-highlight {
+      background: rgba(20, 184, 166, 0.08);
+      font-weight: 600;
+    }
+
+    /* Checksums & Security */
+    .checksum-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 22px;
+    }
+    .checksum-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .checksum-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .checksum-row:first-child { padding-top: 0; }
+    .hash-code {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+    .vt-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      white-space: nowrap;
+    }
+    .vt-pill:hover { text-decoration: none; filter: brightness(1.1); }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 36px 0 48px;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    .footer-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a class="brand" href="#">
+        <img src="assets/logo.png" alt="EyeGuard Logo" width="32" height="32" />
+        <span>EyeGuard</span>
+        <span class="badge-ver">v3.0.0</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="#compare">Compare</a>
+        <a href="#security">Security</a>
+        <a href="https://github.com/hocinechero/EyeGuard" target="_blank" rel="noopener">GitHub</a>
+        <a class="nav-cta" href="#download">Download Free</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero" id="download" style="border-top:none;">
+      <div class="container">
+        <div class="pill-top">
+          <span class="pill-dot"></span>
+          <span>Free &amp; Open-Source (MIT) • Windows 10 / 11 • Compiled Native C/C++</span>
+        </div>
+
+        <h1>The First <span>Full-Desktop E-Reader</span> &amp; Eye Care Suite for Windows</h1>
+
+        <p class="hero-sub">
+          Turn every PDF viewer, browser tab, Word document, and code editor into a calm paper-like reading surface — with zero-lag Reading Ruler, Spotlight Focus, 22 reading palettes, flicker-free dimming, and 20-20-20 break protection.
+        </p>
+
+        <div class="cta-group">
+          <a class="btn btn-primary" href="https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Setup.exe">
+            Download Installer (v3.0.0)
+            <span class="btn-sub">20.2 MB</span>
+          </a>
+          <a class="btn btn-secondary" href="https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.zip">
+            Download Portable ZIP
+            <span class="btn-sub">27.7 MB</span>
+          </a>
+        </div>
+
+        <div>
+          <div class="winget-bar">
+            <code id="winget-cmd">winget install hocinechero.EyeGuard</code>
+            <button class="copy-btn" type="button" onclick="copyWinget(this)">Copy</button>
+          </div>
+        </div>
+
+        <div class="trust-strip">
+          <span>✓ Portable ZIP: <a href="https://www.virustotal.com/gui/file/88eb7509826c64ce164159e0e1cb84202cec6ad9ae6dae394f7e4366f9a57c93" target="_blank" rel="noopener"><strong>0/66 VirusTotal Clean</strong></a></span>
+          <span>✓ Setup EXE: <a href="https://www.virustotal.com/gui/file/a92a05f6c87fc4015f665b97c54f65abeb1652d21efd61b7d729966342c3e784" target="_blank" rel="noopener"><strong>70/71 Clean</strong></a></span>
+          <span>✓ Zero Network Calls</span>
+          <span>✓ Fail-Safe CrashGuard (&lt;200ms restore)</span>
+        </div>
+
+        <div class="demo-frame">
+          <img src="assets/demo.gif" alt="EyeGuard Digital Reading Ruler in Action" width="1280" height="640" />
+        </div>
+        <p class="demo-caption">
+          Real-time Digital Reading Ruler (<code style="font-family:var(--font-mono)">Ctrl+Alt+F</code>) isolating active lines across dense documents with zero lag.
+        </p>
+      </div>
+    </section>
+
+    <!-- Core Pillars -->
+    <section id="features">
+      <div class="container">
+        <div class="section-head">
+          <h2>Built for Deep Reading &amp; Long Screen Sessions</h2>
+          <p>Kindle and Xodo styles stay trapped inside their own viewer. EyeGuard applies across your entire Windows desktop.</p>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <span class="card-tag">Ctrl + Alt + F</span>
+            <h3>Digital Reading Ruler</h3>
+            <p>A translucent cursor-tracking focus slit (60px–700px) that keeps your gaze locked on the current paragraph while softly shading distraction around it.</p>
+          </div>
+          <div class="card">
+            <span class="card-tag">Ctrl + Alt + S</span>
+            <h3>Paragraph Spotlight Mask</h3>
+            <p>Dims sidebars, notifications, and clutter across your whole desktop while illuminating only your active reading block.</p>
+          </div>
+          <div class="card">
+            <span class="card-tag">22 Palettes</span>
+            <h3>Paper, E-Ink &amp; Sepia Themes</h3>
+            <p>Kindle Paperwhite tint, Warm Sepia, Night Contrast, Terminal Slate, 15 Xodo Pro themes, plus full custom color rules per application.</p>
+          </div>
+          <div class="card">
+            <span class="card-tag">1000K – 6500K</span>
+            <h3>Zero-Flicker Dimming</h3>
+            <p>Software luminance down to 5% with zero PWM hardware backlight flicker, paired with a 3-stage circadian solar curve.</p>
+          </div>
+          <div class="card">
+            <span class="card-tag">20-20-20 Rule</span>
+            <h3>Idle-Aware Break Engine</h3>
+            <p>Gentle break prompts, guided breathing micro-rests, and optional strict rest mode — pausing automatically when you step away.</p>
+          </div>
+          <div class="card">
+            <span class="card-tag">CrashGuard</span>
+            <h3>Fail-Safe Gamma Recovery</h3>
+            <p>An isolated Win32 watchdog restores native hardware display gamma in under 200ms if anything unexpectedly closes or crashes.</p>
+          </div>
+        </div>
+
+        <!-- Live Interactive Palette Preview -->
+        <div class="palette-preview">
+          <div>
+            <span class="card-tag">Interactive Preview</span>
+            <h3 style="margin-bottom:8px;">Try EyeGuard Reading Surfaces</h3>
+            <p style="color:var(--text-secondary); font-size:0.93rem;">
+              Switch presets below to preview how harsh white documents transform into restful reading tones across Chrome, Acrobat, Word, and VS Code.
+            </p>
+            <div class="swatch-list" id="swatch-list">
+              <button class="swatch-btn active" type="button" data-bg="#f4ecd8" data-fg="#3b2f20">Warm Sepia</button>
+              <button class="swatch-btn" type="button" data-bg="#e4e7e2" data-fg="#1f2421">E-Ink Paper</button>
+              <button class="swatch-btn" type="button" data-bg="#192227" data-fg="#cbd5e1">Twilight Slate</button>
+              <button class="swatch-btn" type="button" data-bg="#141a15" data-fg="#a7f3d0">Terminal Green</button>
+              <button class="swatch-btn" type="button" data-bg="#231212" data-fg="#fca5a5">Biohacker 1000K</button>
+            </div>
+          </div>
+          <div class="simulated-page" id="simulated-page" style="background:#f4ecd8; color:#3b2f20;">
+            <h4>Clinical Reading Comfort — Page 14</h4>
+            <p>
+              Prolonged exposure to high-luminance RGB white backgrounds accelerates tear-film evaporation and visual fatigue. Applying a calibrated low-glare surface reduces contrast harshness without distorting text legibility during multi-hour study sessions.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screenshots -->
+    <section id="screenshots">
+      <div class="container">
+        <div class="section-head">
+          <h2>Inside EyeGuard v3.0.0</h2>
+          <p>Clean dark &amp; light desktop UI built for instant adjustments and unobtrusive daily workflow.</p>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn active" type="button" onclick="switchShot('assets/screenshots/dashboard.png', 'EyeGuard Color & Screen Dashboard', this)">Color &amp; Dimming Center</button>
+          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/reading_modes.png', 'Reading Ruler, Spotlight & 22 Palettes', this)">Reading &amp; Focus Suite</button>
+          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/timer_breaks.png', '20-20-20 Break Scheduler', this)">Break &amp; Rest Engine</button>
+        </div>
+
+        <div class="shot-viewer">
+          <img id="shot-img" src="assets/screenshots/dashboard.png" alt="EyeGuard Color & Screen Dashboard" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison -->
+    <section id="compare">
+      <div class="container">
+        <div class="section-head">
+          <h2>How EyeGuard Compares</h2>
+          <p>Why pay $20/year or settle for simple orange tinting when you can own the full stack free under MIT?</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Capability</th>
+                <th>Windows Night Light</th>
+                <th>f.lux</th>
+                <th>CareUEyes (Paid)</th>
+                <th class="col-highlight">EyeGuard (v3.0.0)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Line-by-Line Reading Ruler</td>
+                <td>No</td>
+                <td>No</td>
+                <td>$20/yr</td>
+                <td class="col-highlight">Yes (Zero-Lag Tracking)</td>
+              </tr>
+              <tr>
+                <td>Paragraph Spotlight Focus Mask</td>
+                <td>No</td>
+                <td>No</td>
+                <td>No</td>
+                <td class="col-highlight">Yes (Custom Size &amp; Opacity)</td>
+              </tr>
+              <tr>
+                <td>Kindle / E-Ink / Sepia Desktop Themes</td>
+                <td>No</td>
+                <td>No</td>
+                <td>No</td>
+                <td class="col-highlight">Yes (22 Palettes + Picker)</td>
+              </tr>
+              <tr>
+                <td>Ultra-Deep Dimming (Down to 5%)</td>
+                <td>No</td>
+                <td>No</td>
+                <td>$20/yr</td>
+                <td class="col-highlight">Yes (Zero PWM Flicker)</td>
+              </tr>
+              <tr>
+                <td>20-20-20 Break Timer + Away Sensing</td>
+                <td>No</td>
+                <td>No</td>
+                <td>$20/yr</td>
+                <td class="col-highlight">Yes (Win32 Idle Detection)</td>
+              </tr>
+              <tr>
+                <td>Fail-Safe Gamma Crash Watchdog</td>
+                <td>No</td>
+                <td>Can stick</td>
+                <td>Can stick</td>
+                <td class="col-highlight">Yes (&lt;200ms Auto-Restore)</td>
+              </tr>
+              <tr>
+                <td>License &amp; Telemetry</td>
+                <td>Proprietary Telemetry</td>
+                <td>Closed Source</td>
+                <td>$20/year</td>
+                <td class="col-highlight">100% Free MIT • Zero Network Calls</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security & Verification -->
+    <section id="security">
+      <div class="container">
+        <div class="section-head">
+          <h2>Verified Clean &amp; Zero-Telemetry Transparency</h2>
+          <p>Compiled directly to native C/C++ machine code via Nuitka. Every release asset is openly verifiable with SHA-256 checksums and public VirusTotal reports.</p>
+        </div>
+
+        <div class="checksum-box">
+          <div class="checksum-row">
+            <div>
+              <strong>EyeGuard_Portable.zip (v3.0.0)</strong>
+              <div class="hash-code">SHA-256: 88EB7509826C64CE164159E0E1CB84202CEC6AD9AE6DAE394F7E4366F9A57C93</div>
+            </div>
+            <a class="vt-pill" href="https://www.virustotal.com/gui/file/88eb7509826c64ce164159e0e1cb84202cec6ad9ae6dae394f7e4366f9a57c93" target="_blank" rel="noopener">VirusTotal: 0 / 66 Clean ↗</a>
+          </div>
+          <div class="checksum-row">
+            <div>
+              <strong>EyeGuard_Setup.exe (v3.0.0)</strong>
+              <div class="hash-code">SHA-256: A92A05F6C87FC4015F665B97C54F65ABEB1652D21EFD61B7D729966342C3E784</div>
+            </div>
+            <a class="vt-pill" href="https://www.virustotal.com/gui/file/a92a05f6c87fc4015f665b97c54f65abeb1652d21efd61b7d729966342c3e784" target="_blank" rel="noopener">VirusTotal: 70 / 71 Clean ↗</a>
+          </div>
+          <div class="checksum-row">
+            <div>
+              <strong>EyeGuard-Source.zip (v3.0.0 Tag Snapshot)</strong>
+              <div class="hash-code">SHA-256: 0AB60E8EF185171297E4C55A5F310C3DAFD163969BCFC618317FBF5983327E76</div>
+            </div>
+            <a class="btn btn-secondary" style="padding:6px 12px; font-size:0.82rem;" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0" target="_blank" rel="noopener">Release Notes ↗</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div>
+        <strong>EyeGuard</strong> — Released under the <a href="https://github.com/hocinechero/EyeGuard/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a> by <a href="https://github.com/hocinechero" target="_blank" rel="noopener">@hocine_chero</a>.
+      </div>
+      <div class="footer-links" style="align-items:center;">
+        <a href="https://github.com/hocinechero/EyeGuard" target="_blank" rel="noopener">GitHub Repo</a>
+        <a href="https://github.com/hocinechero/EyeGuard/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/hocinechero/EyeGuard/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://alternativeto.net/software/eyeguard/?utm_source=badge&utm_medium=referral" target="_blank" rel="noopener">
+          <img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="EyeGuard | AlternativeTo" width="136" height="44" style="display:block; border-radius:6px;" />
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function copyWinget(btn) {
+      const cmd = document.getElementById("winget-cmd").textContent;
+      navigator.clipboard.writeText(cmd).then(() => {
+        const old = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = old; }, 1600);
+      });
+    }
+
+    function switchShot(src, alt, btn) {
+      const img = document.getElementById("shot-img");
+      img.src = src;
+      img.alt = alt;
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    }
+
+    document.getElementById("swatch-list").addEventListener("click", (e) => {
+      const btn = e.target.closest(".swatch-btn");
+      if (!btn) return;
+      document.querySelectorAll(".swatch-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const page = document.getElementById("simulated-page");
+      page.style.background = btn.dataset.bg;
+      page.style.color = btn.dataset.fg;
+    });
+  </script>
+</body>
+</html>
