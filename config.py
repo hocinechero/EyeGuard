@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 
 DEFAULT_CONFIG = {
-    "version": "3.0.0",
+    "version": "3.1.0",
     "screen": {
         "enabled": True,
         "mode": "Health",
