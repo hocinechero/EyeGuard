@@ -24,7 +24,8 @@ DEFAULT_CONFIG = {
         "software_filter_mode": False,
         "standard_calibration_mode": True,
         "software_mouse_cursor": False,
-        "keep_background_green": False
+        "keep_background_green": False,
+        "deep_crimson": False
     },
     "presets": {
         "Health": {"kelvin": 5000, "brightness": 85},
@@ -34,7 +35,7 @@ DEFAULT_CONFIG = {
         "Cinema": {"kelvin": 5800, "brightness": 90},
         "Gaming": {"kelvin": 6500, "brightness": 100},
         "Bedtime": {"kelvin": 2700, "brightness": 65},
-        "Biohacker": {"kelvin": 1000, "brightness": 50}
+        "Biohacker": {"kelvin": 0, "brightness": 50}
     },
     "timer": {
         "enabled": True,
@@ -213,6 +214,7 @@ class ConfigManager:
             scr["saturation"] = max(0, min(100, int(scr.get("saturation", 100))))
             scr["grayscale"] = bool(scr.get("grayscale", False))
             scr["invert"] = bool(scr.get("invert", False))
+            scr["deep_crimson"] = bool(scr.get("deep_crimson", False))
             if "general" in config and isinstance(config["general"], dict):
                 config["general"]["language"] = "en"
             if "timer" in config and isinstance(config["timer"], dict):
@@ -221,6 +223,14 @@ class ConfigManager:
                     config["timer"]["custom_lock_tips_text"] = (
                         "Close your eyes and breathe deeply to relax your ocular muscles."
                     )
+            presets_cfg = config.get("presets")
+            if isinstance(presets_cfg, dict):
+                bio = presets_cfg.get("Biohacker")
+                if isinstance(bio, dict) and bio.get("kelvin") == 1000 and bio.get("brightness") == 50:
+                    bio["kelvin"] = 0
+                    if "k" in bio:
+                        bio["k"] = 0
+                    self._write_to_disk(config)
             return config
         except Exception:
             return _deep_copy_default()

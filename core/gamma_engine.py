@@ -78,7 +78,8 @@ def kelvin_to_rgb_extended(kelvin: float, calibration_mode: str = "melanopic"):
     Maps 0K..6500K color temperature to normalized sRGB channel multipliers (r, g, b).
     Uses perceptual melanopic blue-light attenuation across 6500K->1000K so standard
     LCD displays (gamma ~2.2) achieve genuine physical blue-light reduction and warm
-    ivory/amber tones while locking pure zero-blue/zero-green ruby red across 0K..1000K.
+    ivory/amber tones while smoothly graduating from pure zero-blue/zero-green ruby red
+    at 0K to glowing ember at 1000K.
     """
     k = max(0.0, min(6500.0, float(kelvin)))
     if abs(k - 6500.0) < 5.0:
@@ -101,13 +102,15 @@ def kelvin_to_rgb_extended(kelvin: float, calibration_mode: str = "melanopic"):
 
     # Default "melanopic" calibration:
     # - 1900K..6500K: monotonic amber curve with aggressive 450-480nm blue suppression & reduced 555nm glare
-    # - 1000K..1900K: smooth convergence from warm amber (G=0.44, B=0.0) to deep ruby red (G=0.0, B=0.0)
-    # - 0K..1000K: extended pure zero-green/zero-blue darkroom zone (R=1.0, G=0.0, B=0.0)
+    # - 1000K..1900K: smooth convergence from warm amber (G=0.44, B=0.0) to glowing ember (G=0.266, B=0.0)
+    # - 0K..1000K: smooth graduation from deep ruby red (G=0.0, B=0.0 at 0K) to glowing ember (G=0.266 at 1000K)
     if k <= 1000.0:
-        return 1.0, 0.0, 0.0
-    if k <= 1900.0:
+        t0 = max(0.0, min(1.0, k / 1000.0))
+        g = 0.266 * (t0 ** 1.25)
+        b = 0.0
+    elif k <= 1900.0:
         t_sub = max(0.0, min(1.0, (k - 1000.0) / 900.0))
-        g = 0.440 * (t_sub ** 1.35)
+        g = 0.266 + (0.440 - 0.266) * (t_sub ** 1.15)
         b = 0.0
     else:
         u = max(0.0, min(1.0, (k - 1900.0) / 4600.0))
@@ -200,6 +203,7 @@ class EyeGuardGammaEngine:
         self.grayscale = False
         self.invert = False
         self.green_background = False
+        self.deep_crimson: bool = False
         self.smooth_transition = True
         self.software_filter_mode = False
         self.standard_calibration_mode = True
@@ -482,6 +486,7 @@ class EyeGuardGammaEngine:
         color_mode: Optional[str] = None,
         saturation_override: Optional[float] = None,
         green_bg_override: Optional[bool] = None,
+        deep_crimson_override: Optional[bool] = None,
     ):
         """
         Applies GPU-composited 5x5 DWM Magnification matrix (MagSetFullscreenColorEffect).
@@ -491,6 +496,7 @@ class EyeGuardGammaEngine:
         if not _HAS_MAGNIFICATION:
             return
 
+        use_crimson = self.deep_crimson if deep_crimson_override is None else bool(deep_crimson_override)
         k_clamped = max(0.0, min(6500.0, float(kelvin)))
         b_clamped = max(self.MIN_HARDWARE_FLOOR, min(1.0, float(brightness)))
         mode = self._normalize_color_mode(color_mode)
@@ -505,6 +511,7 @@ class EyeGuardGammaEngine:
             and (not is_gray)
             and (not is_invert)
             and (not use_green_bg)
+            and (not use_crimson)
         )
 
         if is_identity:
@@ -588,6 +595,12 @@ class EyeGuardGammaEngine:
                     for c in range(3):
                         mat.transform[r][c] = c_mat[r][c]
 
+        if use_crimson:
+            for r in range(5):
+                mat.transform[r][0] *= 0.78
+                mat.transform[r][1] = 0.0
+                mat.transform[r][2] = 0.0
+
         mat.transform[3][3] = 1.0
         mat.transform[4][4] = 1.0
 
@@ -635,6 +648,7 @@ class EyeGuardGammaEngine:
                 and (not grayscale)
                 and (not invert)
                 and (not self.green_background)
+                and (not self.deep_crimson)
             )
 
             if is_clean_identity:
@@ -650,11 +664,25 @@ class EyeGuardGammaEngine:
             if self._is_lut_eligible(mode, grayscale, invert, sat):
                 clamp_floor = self._should_clamp_lut_floor(target_monitor)
                 lut_b = max(self.LUT_SAFE_FLOOR, eff_b) if clamp_floor else eff_b
-                ramp = self._build_ramp(k_val, lut_b, grayscale=False, invert=False, apply_green_bg=self.green_background)
+                ramp = self._build_ramp(
+                    k_val,
+                    lut_b,
+                    grayscale=False,
+                    invert=False,
+                    apply_green_bg=self.green_background,
+                    deep_crimson=self.deep_crimson,
+                )
                 ramp_ok = self._apply_ramp(ramp, target_monitor)
                 if (not ramp_ok) and eff_b < self.LUT_SAFE_FLOOR and self._should_clamp_lut_floor(target_monitor):
                     lut_b = self.LUT_SAFE_FLOOR
-                    ramp = self._build_ramp(k_val, lut_b, grayscale=False, invert=False, apply_green_bg=self.green_background)
+                    ramp = self._build_ramp(
+                        k_val,
+                        lut_b,
+                        grayscale=False,
+                        invert=False,
+                        apply_green_bg=self.green_background,
+                        deep_crimson=self.deep_crimson,
+                    )
                     ramp_ok = self._apply_ramp(ramp, target_monitor)
 
                 if ramp_ok:
@@ -673,6 +701,7 @@ class EyeGuardGammaEngine:
                             color_mode="normal",
                             saturation_override=sat,
                             green_bg_override=False,
+                            deep_crimson_override=False,
                         )
                         self._active_backend = "hybrid_lut_dwm"
                     self._applied_kelvin = k_val
@@ -682,7 +711,14 @@ class EyeGuardGammaEngine:
             # Full Software DWM fallback (Reading themes, Invert, Grayscale, software_filter_mode, or LUT blocked)
             if self._lut_active:
                 self._restore_original_hardware_lut(target_monitor)
-            self._apply_dwm_color_effect(k_val, eff_b, grayscale, invert, color_mode=mode)
+            self._apply_dwm_color_effect(
+                k_val,
+                eff_b,
+                grayscale,
+                invert,
+                color_mode=mode,
+                deep_crimson_override=self.deep_crimson,
+            )
             self._active_backend = "software_dwm"
             self._applied_kelvin = k_val
             self._applied_brightness = b_val
@@ -937,7 +973,9 @@ class EyeGuardGammaEngine:
         grayscale: bool = False,
         invert: bool = False,
         apply_green_bg: Optional[bool] = None,
+        deep_crimson: Optional[bool] = None,
     ) -> GAMMA_RAMP:
+        use_crimson = self.deep_crimson if deep_crimson is None else bool(deep_crimson)
         rf, gf, bf = kelvin_to_rgb_extended(kelvin)
         use_green = self.green_background if apply_green_bg is None else bool(apply_green_bg)
         if use_green:
@@ -953,7 +991,13 @@ class EyeGuardGammaEngine:
         ramp = GAMMA_RAMP()
         for i in range(256):
             val = (255 - i) / 255.0 if invert else (i / 255.0)
-            if grayscale:
+            if use_crimson:
+                shaped = (val ** 1.55) * 0.78
+                red_word = int(max(0, min(65535, round(shaped * 65535.0 * b))))
+                ramp.Red[i] = red_word
+                ramp.Green[i] = 0
+                ramp.Blue[i] = 0
+            elif grayscale:
                 gray = val * (0.299 * rf + 0.587 * gf + 0.114 * bf)
                 word_val = int(max(0, min(65535, round(gray * 65535.0))))
                 ramp.Red[i] = word_val
@@ -1170,9 +1214,22 @@ class EyeGuardGammaEngine:
             color_mode=self.color_mode,
         )
 
+    def set_deep_crimson(self, enabled: bool):
+        """Toggles pure-hardware-LUT Deep Crimson mode (G=0/B=0, non-linear glare taming)."""
+        self.deep_crimson = bool(enabled)
+        return self.set_display(
+            self._current_kelvin,
+            self._current_brightness * 100.0,
+            grayscale=self.grayscale,
+            invert=self.invert,
+            smooth=False,
+            color_mode=self.color_mode,
+        )
+
     def reset(self):
         self.saturation = 1.0
         self.green_background = False
+        self.deep_crimson = False
         self.color_mode = "normal"
         self.grayscale = False
         self.invert = False

@@ -22,13 +22,20 @@ class TestKelvinAndOptics(unittest.TestCase):
     def test_identity_at_6500k(self):
         self.assertEqual(gamma_engine.kelvin_to_rgb_extended(6500), (1.0, 1.0, 1.0))
 
-    def test_deep_ruby_at_1000k(self):
+    def test_deep_ruby_at_0k_and_ember_at_1000k(self):
+        self.assertEqual(gamma_engine.kelvin_to_rgb_extended(0), (1.0, 0.0, 0.0))
         r, g, b = gamma_engine.kelvin_to_rgb_extended(1000)
-        self.assertEqual((r, g, b), (1.0, 0.0, 0.0))
+        self.assertEqual(r, 1.0)
+        self.assertAlmostEqual(g, 0.266, places=6)
+        self.assertEqual(b, 0.0)
 
     def test_extended_zero_kelvin_darkroom(self):
-        for k in (0, 200, 505, 999):
-            self.assertEqual(gamma_engine.kelvin_to_rgb_extended(k), (1.0, 0.0, 0.0))
+        self.assertEqual(gamma_engine.kelvin_to_rgb_extended(0), (1.0, 0.0, 0.0))
+        for k in (250, 500, 750, 1000):
+            r, g, b = gamma_engine.kelvin_to_rgb_extended(k)
+            self.assertEqual(r, 1.0)
+            self.assertGreater(g, 0.0)
+            self.assertEqual(b, 0.0)
         self.assertEqual(gamma_engine.kelvin_to_rgb_extended(0, "cie"), (1.0, 0.0, 0.0))
         self.assertEqual(gamma_engine.kelvin_to_rgb_extended(505, "cie"), (1.0, 0.0, 0.0))
 
@@ -51,12 +58,23 @@ class TestKelvinAndOptics(unittest.TestCase):
 
     def test_strict_monotonic_across_full_range(self):
         prev = (-1.0, -1.0, -1.0)
-        for k in range(1000, 6501, 100):
+        for k in range(0, 6501, 100):
             r, g, b = gamma_engine.kelvin_to_rgb_extended(k)
             self.assertEqual(r, 1.0)
             self.assertGreaterEqual(g, prev[1])
             self.assertGreaterEqual(b, prev[2])
             prev = (r, g, b)
+
+        prev_g = -1.0
+        for k in (0, 250, 500, 750, 1000):
+            r, g, b = gamma_engine.kelvin_to_rgb_extended(k)
+            self.assertEqual(r, 1.0)
+            self.assertEqual(b, 0.0)
+            self.assertGreater(g, prev_g)
+            prev_g = g
+        # Continuity at 1000K and 1900K boundaries
+        self.assertAlmostEqual(gamma_engine.kelvin_to_rgb_extended(1000)[1], 0.266, places=6)
+        self.assertAlmostEqual(gamma_engine.kelvin_to_rgb_extended(1900)[1], 0.440, places=6)
 
 
 class TestHybridDisplayEngine(unittest.TestCase):
@@ -214,11 +232,11 @@ class TestHybridDisplayEngine(unittest.TestCase):
     def test_saturation_zero_uses_hybrid_lut_plus_dwm_and_perceptual_dimming(self):
         eng, last_ramp, last_mat, _, mock_mag = self._make_mocked_engine()
         eng.set_saturation(0)
-        eng.set_display(1000, 47, smooth=False)
+        eng.set_display(0, 47, smooth=False)
         self.assertTrue(eng.wait_idle(2.0))
         self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
         expected_eff = 0.47 ** eng.PERCEPTUAL_DIM_EXPONENT
-        # LUT applies 1000K ruby + perceptual dimming + cursor tinting
+        # LUT applies 0K pure ruby + perceptual dimming + cursor tinting
         self.assertAlmostEqual(last_ramp["ramp"].Red[255] / 65535.0, expected_eff, delta=0.01)
         self.assertEqual(last_ramp["ramp"].Green[255], 0)
         self.assertEqual(last_ramp["ramp"].Blue[255], 0)
@@ -241,6 +259,73 @@ class TestHybridDisplayEngine(unittest.TestCase):
         self.assertEqual(eng.color_mode, "normal")
         self.assertEqual(eng.get_active_backend(), "identity")
         self.assertTrue(mock_mag.MagUninitialize.called)
+
+    def test_deep_crimson_pure_hardware_lut_and_reset(self):
+        eng, last_ramp, _, _, mock_mag = self._make_mocked_engine()
+        eng.set_display(4000, 50, smooth=False)
+        self.assertTrue(eng.wait_idle(2.0))
+        eng.set_deep_crimson(True)
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "hardware_lut")
+        self.assertFalse(mock_mag.MagSetFullscreenColorEffect.called)
+        for i in range(256):
+            self.assertEqual(last_ramp["ramp"].Green[i], 0)
+            self.assertEqual(last_ramp["ramp"].Blue[i], 0)
+        eff_b = 0.50 ** eng.PERCEPTUAL_DIM_EXPONENT
+        exp_128 = int(round(((128 / 255.0) ** 1.55) * 0.78 * 65535.0 * eff_b))
+        exp_255 = int(round(0.78 * 65535.0 * eff_b))
+        self.assertEqual(last_ramp["ramp"].Red[128], exp_128)
+        self.assertEqual(last_ramp["ramp"].Red[255], exp_255)
+        self.assertLess(last_ramp["ramp"].Red[128], last_ramp["ramp"].Red[255] // 2)
+
+        # is_clean_identity must stay off at 6500K / 100% when deep_crimson=True
+        eng.set_display(6500, 100, smooth=False)
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "hardware_lut")
+        self.assertFalse(mock_mag.MagSetFullscreenColorEffect.called)
+        self.assertEqual(last_ramp["ramp"].Green[255], 0)
+        self.assertEqual(last_ramp["ramp"].Blue[255], 0)
+        self.assertEqual(last_ramp["ramp"].Red[255], int(round(0.78 * 65535.0)))
+
+        # reset() clears deep_crimson back to identity
+        eng.reset()
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertFalse(eng.deep_crimson)
+        self.assertEqual(eng.get_active_backend(), "identity")
+
+    def test_deep_crimson_with_invert_uses_dwm_matrix(self):
+        eng, _, last_mat, _, mock_mag = self._make_mocked_engine()
+        eng.set_deep_crimson(True)
+        eng.set_display(6500, 80, invert=True, smooth=False, color_mode="normal")
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "software_dwm")
+        self.assertTrue(mock_mag.MagSetFullscreenColorEffect.called)
+        m = last_mat["mat"].transform
+        for r in range(5):
+            self.assertEqual(m[r][1], 0.0)
+            self.assertEqual(m[r][2], 0.0)
+        expected_eff = 0.80 ** eng.PERCEPTUAL_DIM_EXPONENT
+        self.assertAlmostEqual(m[0][0], -0.78 * expected_eff, delta=0.01)
+        self.assertAlmostEqual(m[4][0], 0.78 * expected_eff, delta=0.01)
+        out_white_r = m[0][0] + m[1][0] + m[2][0] + m[4][0]
+        self.assertAlmostEqual(out_white_r, 0.0, delta=0.02)
+
+    def test_deep_crimson_hybrid_lut_dwm_does_not_double_attenuate(self):
+        eng, last_ramp, last_mat, _, mock_mag = self._make_mocked_engine()
+        eng.set_saturation(50)
+        eng.set_deep_crimson(True)
+        eng.set_display(0, 50, smooth=False)
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
+        self.assertTrue(mock_mag.MagSetFullscreenColorEffect.called)
+        eff_b = 0.50 ** eng.PERCEPTUAL_DIM_EXPONENT
+        self.assertEqual(last_ramp["ramp"].Red[255], int(round(0.78 * 65535.0 * eff_b)))
+        self.assertEqual(last_ramp["ramp"].Green[255], 0)
+        self.assertEqual(last_ramp["ramp"].Blue[255], 0)
+        m = last_mat["mat"].transform
+        # DWM must not re-apply 0.78 on top of LUT's 0.78; white input R gain stays 1.0
+        out_white_r = m[0][0] + m[1][0] + m[2][0] + m[4][0]
+        self.assertAlmostEqual(out_white_r, 1.0, delta=0.02)
 
     def test_crash_guard_cmd_frozen_uses_flag(self):
         eng, _, _, _, _ = self._make_mocked_engine()
@@ -374,16 +459,24 @@ class TestConfigCircadianAndBindings(unittest.TestCase):
                 self.assertEqual(eg.current_b, 1)
                 mock_eng.set_hardware_brightness.assert_called_with(1)
 
+                eg.set_deep_crimson(True)
+                self.assertTrue(eg.is_deep_crimson)
+                mock_eng.set_deep_crimson.assert_called_with(True)
+
                 paused = eg.disable_filter_temporarily(60)
                 self.assertTrue(paused["disabled"])
                 self.assertFalse(mock_eng.green_background)
+                self.assertFalse(mock_eng.deep_crimson)
 
                 resumed = eg.disable_filter_temporarily(0)
                 self.assertFalse(resumed["disabled"])
                 self.assertTrue(mock_eng.green_background)
+                self.assertTrue(mock_eng.deep_crimson)
 
                 res = eg.reset_natural()
-                self.assertEqual(res, {"kelvin": 6500, "brightness": 100, "mode": "normal"})
+                self.assertEqual(res, {"kelvin": 6500, "brightness": 100, "mode": "normal", "deep_crimson": False})
+                self.assertFalse(eg.is_deep_crimson)
+                self.assertFalse(mock_eng.deep_crimson)
                 eg.desktop_overlays.hide_toast.assert_called()
 
 

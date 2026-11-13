@@ -298,12 +298,14 @@ class EyeGuardApp:
         self.current_hw_b = live_hw if live_hw is not None else int(scr_cfg.get("hardware_brightness", 100))
         self.is_gray = bool(scr_cfg.get("grayscale", False))
         self.is_invert = bool(scr_cfg.get("invert", False))
+        self.is_deep_crimson = bool(scr_cfg.get("deep_crimson", False))
         self.color_filter_mode = str(scr_cfg.get("color_filter_mode", "normal"))
         if self.color_filter_mode in ("day", "standard"):
             self.color_filter_mode = "normal" 
 
         self.gamma_engine.saturation = max(0.0, min(1.0, self.current_sat / 100.0))
         self.gamma_engine.green_background = bool(scr_cfg.get("keep_background_green", False))
+        self.gamma_engine.deep_crimson = self.is_deep_crimson
         self.gamma_engine.smooth_transition = bool(scr_cfg.get("smooth_transition", True))
         self.gamma_engine.software_filter_mode = bool(scr_cfg.get("software_filter_mode", False))
         self.gamma_engine.standard_calibration_mode = bool(scr_cfg.get("standard_calibration_mode", True))
@@ -798,7 +800,7 @@ class EyeGuardApp:
                 "Cinema": (5800, 90),
                 "Gaming": (6500, 100),
                 "Bedtime": (2700, 65),
-                "Biohacker": (1000, 50),
+                "Biohacker": (0, 50),
             }
             if rule_mode in preset_map:
                 pk, pb = preset_map[rule_mode]
@@ -838,15 +840,18 @@ class EyeGuardApp:
         self.current_sat = 100
         self.is_gray = False
         self.is_invert = False
+        self.is_deep_crimson = False
         self.color_filter_mode = "normal"
         self.active_reading_theme = "normal"
         self._filter_disabled_until_ts = None
         self.gamma_engine.saturation = 1.0
+        self.gamma_engine.deep_crimson = False
         self.config_mgr.set("screen", "kelvin", 6500)
         self.config_mgr.set("screen", "brightness", 100)
         self.config_mgr.set("screen", "saturation", 100)
         self.config_mgr.set("screen", "grayscale", False)
         self.config_mgr.set("screen", "invert", False)
+        self.config_mgr.set("screen", "deep_crimson", False)
         self.config_mgr.set("screen", "color_filter_mode", "normal")
         self.config_mgr.set("screen", "reading_theme", "normal")
         self.config_mgr.set("screen", "mode", "Natural")
@@ -870,7 +875,7 @@ class EyeGuardApp:
                 pass
 
         self._schedule_tray_update()
-        return {"kelvin": 6500, "brightness": 100, "mode": "normal"}
+        return {"kelvin": 6500, "brightness": 100, "mode": "normal", "deep_crimson": False}
 
     def _get_min_kelvin(self) -> int:
         return 0 if bool(self.config_mgr.get("screen", "unlock_extended_range", default=True)) else 1900
@@ -885,12 +890,14 @@ class EyeGuardApp:
             self.gamma_engine.green_background = bool(
                 self.config_mgr.get("screen", "keep_background_green", default=False)
             )
+            self.gamma_engine.deep_crimson = bool(getattr(self, "is_deep_crimson", False))
             self.gamma_engine.set_display(
                 self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
             )
             return {"disabled": False, "until_ts": None}
         self._filter_disabled_until_ts = time.time() + int(minutes) * 60
         self.gamma_engine.green_background = False
+        self.gamma_engine.deep_crimson = False
         self.gamma_engine.set_display(6500, 100, False, False, smooth=True, color_mode="normal")
         return {"disabled": True, "until_ts": self._filter_disabled_until_ts}
 
@@ -929,7 +936,7 @@ class EyeGuardApp:
             "Cinema": (5800, 90),
             "Gaming": (6500, 100),
             "Bedtime": (2700, 65),
-            "Biohacker": (1000, 50),
+            "Biohacker": (0, 50),
             "Natural": (6500, 100),
         }
         if name in presets:
@@ -1019,7 +1026,10 @@ class EyeGuardApp:
             self._tray_update_timer.cancel()
 
         def _update():
-            rf, gf, bf = kelvin_to_rgb_extended(self.current_k)
+            if getattr(self, "is_deep_crimson", False):
+                rf, gf, bf = (1.0, 0.0, 0.0)
+            else:
+                rf, gf, bf = kelvin_to_rgb_extended(self.current_k)
             self.tray_mgr.update_icon_color(int(rf * 255), int(gf * 255), int(bf * 255))
 
         self._tray_update_timer = threading.Timer(0.35, _update)
@@ -1045,6 +1055,13 @@ class EyeGuardApp:
             self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=False, color_mode=self.color_filter_mode
         )
         self.config_mgr.set("screen", "invert", self.is_invert)
+
+    def set_deep_crimson(self, enabled: bool):
+        self.is_deep_crimson = bool(enabled)
+        self.config_mgr.set("screen", "deep_crimson", self.is_deep_crimson)
+        self.gamma_engine.set_deep_crimson(self.is_deep_crimson)
+        self._schedule_tray_update()
+        return {"deep_crimson": self.is_deep_crimson}
 
     # --- Focus Engine (Reading Focus + Spotlight Focus) ---
     def toggle_focus_ruler(self):
@@ -1707,6 +1724,7 @@ class EyeGuardApp:
             "custom_txt_hex": self.custom_txt_hex,
             "is_gray": self.is_gray,
             "is_invert": self.is_invert,
+            "deep_crimson": bool(getattr(self, "is_deep_crimson", False)),
             "filter_temp_disabled": self._filter_disabled_until_ts is not None,
             "circadian_active": self.circadian_active,
             "timer_enabled": st_data["enabled"],
@@ -2136,6 +2154,9 @@ class JSBridgeApi:
 
     def toggle_invert(self, enable):
         self._app.toggle_invert(bool(enable))
+
+    def set_deep_crimson(self, enabled):
+        return self._app.set_deep_crimson(bool(enabled))
 
     def toggle_extended_range(self, enable):
         en = bool(enable)

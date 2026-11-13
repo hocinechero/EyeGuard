@@ -708,7 +708,7 @@
             width: 100%;
             height: 10px;
             border-radius: 9999px;
-            background: linear-gradient(90deg, #991b1b 0%, #ea580c 20%, #f59e0b 45%, #fef08a 75%, #ffffff 100%);
+            background: linear-gradient(90deg, #8b0000 0%, #c81e0a 8%, #ea580c 15.5%, #f59e0b 32%, #fef08a 75%, #ffffff 100%);
             box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
             border: none;
             margin: 0;
@@ -2032,6 +2032,13 @@
         </header>
 
         <div class="stage-body">
+            <div id="blackout-warning-banner" style="display:none; align-items:flex-start; gap:8px; background:rgba(220, 38, 38, 0.14); border:1px solid rgba(239, 68, 68, 0.55); border-radius:8px; padding:8px 11px; margin-bottom:8px;">
+                <span style="font-size:14px; line-height:1.2;">⚠️</span>
+                <div style="flex:1;">
+                    <div id="txt-blackout-warn-title" style="font-size:11px; font-weight:700; color:#fca5a5; margin-bottom:2px;">Blackout Warning: Terminal Green + 0K / Deep Crimson</div>
+                    <div id="txt-blackout-warn-desc" style="font-size:10px; color:var(--text-primary); line-height:1.35;">Combining Terminal Green with 0K or Deep Crimson zeroes all RGB channels (R=0, G=0, B=0) and turns the screen completely black. Switch back to Normal, raise Kelvin, or turn Deep Crimson off.</div>
+                </div>
+            </div>
             <!-- =========================================================
                  TAB 1: DISPLAY & COLOR TEMPERATURE
                  ========================================================= -->
@@ -2116,9 +2123,22 @@
                         <div class="tile-title"><span id="p-t-sleep">Night</span><span id="p-t-bedtime" style="display:none;">Night</span></div>
                         <div class="tile-sub" id="psub-Bedtime">2700K · 65%</div>
                     </div>
-                    <div class="preset-tile" data-preset="Biohacker" onclick="selectPreset('Biohacker', 1000, 50)">
-                        <div class="tile-title"><span id="p-t-biohacker">Ruby 1000K</span></div>
-                        <div class="tile-sub" id="psub-Biohacker"><span id="p-s-biohacker">1000K · 50%</span></div>
+                    <div class="preset-tile" data-preset="Biohacker" onclick="selectPreset('Biohacker', 0, 50)">
+                        <div class="tile-title"><span id="p-t-biohacker">Biohacker Ruby 0K</span></div>
+                        <div class="tile-sub" id="psub-Biohacker"><span id="p-s-biohacker">0K · 50%</span></div>
+                    </div>
+                </div>
+
+                <div class="hero-metric-card" style="padding: 8px 12px; margin-bottom: 0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                        <div>
+                            <div class="metric-title" id="t-crimson-title" style="font-size: 12px; color: #f87171;">Deep Crimson Filter (Ruby+)</div>
+                            <div id="t-crimson-desc" style="font-size: 10px; color: var(--text-secondary);">Pure G=0/B=0 signal with deep gamma shaping to tame white-page glare</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="chk-deep-crimson" onchange="toggleDeepCrimson(this.checked)">
+                            <span class="toggle-track"></span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -2181,6 +2201,11 @@
                             <button id="btn-scope-app" class="scope-btn" onclick="setReadingScope('app')">Specific App</button>
                         </div>
                     </div>
+                </div>
+
+                <div id="terminal-blackout-hint" style="display:none; align-items:center; gap:6px; background:rgba(245, 158, 11, 0.10); border:1px solid rgba(245, 158, 11, 0.40); border-radius:6px; padding:5px 9px; margin-bottom:6px; font-size:10px; color:#fcd34d;">
+                    <span>⚠️</span>
+                    <span id="txt-terminal-blackout-hint">Notice: 0K / Deep Crimson is currently active — selecting Terminal Green or Xodo Terminal will turn the screen completely black (R=0, G=0, B=0).</span>
                 </div>
 
                 <!-- Per-Application Trigger Selector (Shown when Specific App is chosen) -->
@@ -2602,9 +2627,9 @@
                             <select class="care-select" id="sel-bedtime-k" onchange="saveCircadianSchedule()">
                                 <option value="2700">2700K (Warm Night)</option>
                                 <option value="1900" selected>1900K (Candlelight)</option>
-                                <option value="1200">1200K (Ember)</option>
-                                <option value="1000">1000K (Ruby Darkroom)</option>
-                                <option value="0">0K (Pure Zero-Blue Red)</option>
+                                <option value="1200">1200K (Warm Ember)</option>
+                                <option value="1000">1000K (Glowing Ember)</option>
+                                <option value="0">0K (Pure Ruby Darkroom)</option>
                             </select>
                             <select class="care-select" id="sel-bedtime-b" onchange="saveCircadianSchedule()">
                                 <option value="70">70%</option>
@@ -2777,7 +2802,7 @@
                                         <option value="Cinema">Cinema (5800K)</option>
                                         <option value="Gaming">Gaming (6500K)</option>
                                         <option value="Bedtime">Bedtime (2700K)</option>
-                                        <option value="Biohacker">Ruby Night Vision (1000K)</option>
+                                        <option value="Biohacker">Ruby Night Vision (0K)</option>
                                     </optgroup>
                                 </select>
                                 <button class="btn-primary" onclick="addNewAppRule()" style="padding: 4px 12px; font-size: 11px; font-weight: 700; white-space: nowrap;">+ Add Rule</button>
@@ -3242,7 +3267,7 @@
                                 <option value="Cinema">Cinema (5800K)</option>
                                 <option value="Gaming">Gaming (6500K)</option>
                                 <option value="Bedtime">Bedtime (2700K)</option>
-                                <option value="Biohacker">Biohacker (1000K)</option>
+                                <option value="Biohacker">Biohacker (0K)</option>
                                 <option value="dark">Dark Mode (Invert)</option>
                                 <option value="warm">Warm (3800K)</option>
                                 <option value="grayscale">E-Ink Grayscale</option>
@@ -3322,6 +3347,7 @@
         let lastUserSliderInteraction = 0;
         let isGray = false;
         let isInvert = false;
+        let isDeepCrimson = false;
         let currentColorFilterMode = 'normal';
         let isRuler = false;
         let isTimerPaused = true;
@@ -3355,7 +3381,7 @@
                 pMovie: "Cinema & Movie",
                 pGaming: "Fast-Paced Gaming",
                 pSleep: "Bedtime Relax",
-                pBiohacker: "Biohacker Ruby 1000K",
+                pBiohacker: "Biohacker Ruby 0K",
                 pBiohackerSub: "Astronomical Darkroom",
 
                 proTools: "Advanced Display Tools",
@@ -3363,6 +3389,11 @@
                 grayDesc: "Converts entire display to grayscale for distraction-free reading",
                 invertTitle: "Hardware Color Inversion",
                 invertDesc: "GPU-level smart dark mode inverting white surfaces without blooming",
+                crimsonTitle: "فلتر الأحمر القاني العميق (Ruby+)",
+                crimsonDesc: "إغلاق تام للأخضر والأزرق مع تعميق جاما الأحمر لتخفيف وهج الخلفيات البيضاء",
+                blackoutWarnTitle: "تحذير شاشة سوداء: Terminal Green + 0K / Deep Crimson",
+                blackoutWarnDesc: "دمج سمة Terminal Green مع درجة 0K أو Deep Crimson يصفّر جميع القنوات اللونية (R=0, G=0, B=0) فتصبح الشاشة سوداء تماماً. ارجع إلى Normal أو ارفع درجة الكلفن / أطفئ Deep Crimson.",
+                terminalHintText: "تنبيه: 0K / Deep Crimson مفعّل حالياً — اختيار Terminal Green أو Xodo Terminal سيجعل الشاشة سوداء تماماً (R=0, G=0, B=0).",
 
                 timerStatusWorking: "Active Focus Work Session",
                 timerSubLabel: "Your eyes are protected from blue light strain",
@@ -3460,7 +3491,7 @@
                 pMovie: "Cinema & Movie",
                 pGaming: "Fast-Paced Gaming",
                 pSleep: "Bedtime Relax",
-                pBiohacker: "Biohacker Ruby 1000K",
+                pBiohacker: "Biohacker Ruby 0K",
                 pBiohackerSub: "Astronomical Darkroom",
 
                 proTools: "Advanced Display Tools",
@@ -3468,6 +3499,11 @@
                 grayDesc: "Converts entire display to grayscale for distraction-free reading",
                 invertTitle: "Hardware Color Inversion",
                 invertDesc: "GPU-level smart dark mode inverting white surfaces without blooming",
+                crimsonTitle: "Deep Crimson Filter (Ruby+)",
+                crimsonDesc: "Pure G=0/B=0 signal with deep gamma shaping to tame white-page glare",
+                blackoutWarnTitle: "Blackout Warning: Terminal Green + 0K / Deep Crimson",
+                blackoutWarnDesc: "Combining Terminal Green with 0K or Deep Crimson zeroes all RGB channels (R=0, G=0, B=0) and turns the screen completely black. Switch back to Normal, raise Kelvin, or turn Deep Crimson off.",
+                terminalHintText: "Notice: 0K / Deep Crimson is currently active — selecting Terminal Green or Xodo Terminal will turn the screen completely black (R=0, G=0, B=0).",
 
                 timerStatusWorking: "Active Focus Work Session",
                 timerSubLabel: "Your eyes are protected from blue light strain",
@@ -3702,17 +3738,17 @@
             if (data.bedtime && document.getElementById('input-bedtime')) {
                 document.getElementById('input-bedtime').value = data.bedtime;
             }
-            if (data.day_kelvin && document.getElementById('sel-day-k')) {
+            if (typeof data.day_kelvin === 'number' && document.getElementById('sel-day-k')) {
                 document.getElementById('sel-day-k').value = String(data.day_kelvin);
                 const el = document.getElementById('solar-lbl-day');
                 if (el) el.innerText = data.day_kelvin + 'K';
             }
-            if (data.night_kelvin && document.getElementById('sel-night-k')) {
+            if (typeof data.night_kelvin === 'number' && document.getElementById('sel-night-k')) {
                 document.getElementById('sel-night-k').value = String(data.night_kelvin);
                 const el = document.getElementById('solar-lbl-sunset');
                 if (el) el.innerText = data.night_kelvin + 'K';
             }
-            if (data.bedtime_kelvin && document.getElementById('sel-bedtime-k')) {
+            if (typeof data.bedtime_kelvin === 'number' && document.getElementById('sel-bedtime-k')) {
                 document.getElementById('sel-bedtime-k').value = String(data.bedtime_kelvin);
                 const el = document.getElementById('solar-lbl-bed');
                 if (el) el.innerText = data.bedtime_kelvin + 'K';
@@ -3925,6 +3961,8 @@
             setTxt('t-gray-desc', d.grayDesc);
             setTxt('t-invert-title', d.invertTitle);
             setTxt('t-invert-desc', d.invertDesc);
+            setTxt('t-crimson-title', d.crimsonTitle);
+            setTxt('t-crimson-desc', d.crimsonDesc);
 
             setTxt('timer-sub-label', d.timerSubLabel);
             setTxt('btn-timer-action', isTimerPaused ? d.btnTimerResume : d.btnTimerPause);
@@ -3991,6 +4029,7 @@
             updateKelvinText(currentK);
             updateTimerBadge();
             updatePresetBadge();
+            updateBlackoutWarningBanner();
             renderHotkeysList();
         }
 
@@ -3998,7 +4037,9 @@
             const numEl = document.getElementById('val-kelvin-hero');
             if (numEl) numEl.innerText = k;
             let desc = "";
-            if (k <= 1200) desc = "Ruby Night Vision (Astronomical)";
+            if (k === 0) desc = "Pure Ruby Darkroom (Zero-Green/Blue)";
+            else if (k <= 500) desc = "Ruby Night Vision (Astronomical)";
+            else if (k <= 1300) desc = "Glowing Ember";
             else if (k < 2200) desc = "Warm Candlelight";
             else if (k < 3500) desc = "Warm Bedtime";
             else if (k < 5200) desc = "Balanced Office Comfort";
@@ -4013,10 +4054,12 @@
             const badge = document.getElementById('top-badge-preset');
             if (!badge) return;
             const sk = document.getElementById('slider-kelvin');
-            const k = (typeof currentK === 'number' && !isNaN(currentK)) ? currentK : (parseInt(sk?.value) || 5000);
+            const parsedSk = parseInt(sk?.value, 10);
+            const k = (typeof currentK === 'number' && !isNaN(currentK)) ? currentK : (!Number.isNaN(parsedSk) ? parsedSk : 5000);
             
             let modeTitle = "Healthy";
-            if (k <= 1200) modeTitle = "Ruby Darkroom";
+            if (k <= 500) modeTitle = "Ruby Darkroom";
+            else if (k <= 1300) modeTitle = "Glowing Ember";
             else if (k < 2200) modeTitle = "Warm Candlelight";
             else if (k < 3500) modeTitle = "Bedtime Relax";
             else if (k < 4800) modeTitle = "Focused Reading";
@@ -4121,6 +4164,43 @@
             if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_extended_range) {
                 window.pywebview.api.toggle_extended_range(enabled);
             }
+            updateBlackoutWarningBanner();
+        }
+
+        function updateBlackoutWarningBanner() {
+            const isTerminalTheme = (activeReadingThemeMode === 'console' || activeReadingThemeMode === 'xodo_console');
+            const isZeroRedFilter = (Number(currentK) === 0 || !!isDeepCrimson);
+            const activeBanner = document.getElementById('blackout-warning-banner');
+            const hintBanner = document.getElementById('terminal-blackout-hint');
+            const d = (typeof i18n !== 'undefined' && i18n[currentLang]) || (typeof i18n !== 'undefined' ? i18n.en : null);
+
+            if (d) {
+                const tEl = document.getElementById('txt-blackout-warn-title');
+                const dEl = document.getElementById('txt-blackout-warn-desc');
+                const hEl = document.getElementById('txt-terminal-blackout-hint');
+                if (tEl && d.blackoutWarnTitle) tEl.innerText = d.blackoutWarnTitle;
+                if (dEl && d.blackoutWarnDesc) dEl.innerText = d.blackoutWarnDesc;
+                if (hEl && d.terminalHintText) hEl.innerText = d.terminalHintText;
+            }
+
+            if (activeBanner) {
+                activeBanner.style.display = (isTerminalTheme && isZeroRedFilter) ? 'flex' : 'none';
+            }
+            if (hintBanner) {
+                hintBanner.style.display = (!isTerminalTheme && isZeroRedFilter) ? 'flex' : 'none';
+            }
+        }
+
+        async function toggleDeepCrimson(enabled) {
+            isDeepCrimson = !!enabled;
+            const chk = document.getElementById('chk-deep-crimson');
+            if (chk && chk.checked !== isDeepCrimson) chk.checked = isDeepCrimson;
+            updateBlackoutWarningBanner();
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_deep_crimson) {
+                try {
+                    await window.pywebview.api.set_deep_crimson(isDeepCrimson);
+                } catch (e) {}
+            }
         }
 
         function handleKelvinChange(val, skipPresetSave) {
@@ -4134,6 +4214,7 @@
             currentK = isNaN(parsed) ? 5000 : Math.max(minK, Math.min(maxK, parsed));
             updateKelvinText(currentK);
             updatePresetBadge();
+            updateBlackoutWarningBanner();
             if (!skipPresetSave) scheduleSaveActivePreset();
 
             if (kelvinTimer) clearTimeout(kelvinTimer);
@@ -4261,6 +4342,7 @@
             updateKelvinText(k);
             document.getElementById('val-bright-hero').innerText = b;
             updatePresetBadge();
+            updateBlackoutWarningBanner();
         }
 
         async function resetPresetsToDefault() {
@@ -4295,6 +4377,10 @@
             updateKelvinText(6500);
             updatePresetBadge();
             selectColorFilterMode('day');
+            isDeepCrimson = false;
+            const chkCrimsonReset = document.getElementById('chk-deep-crimson');
+            if (chkCrimsonReset) chkCrimsonReset.checked = false;
+            updateBlackoutWarningBanner();
             document.querySelectorAll('.preset-tile').forEach(t => t.classList.remove('active'));
             currentPresetKey = 'Natural';
             if (window.pywebview && window.pywebview.api && window.pywebview.api.reset_natural) {
@@ -4492,6 +4578,7 @@
                 const scopeLabel = (currentReadingScope === 'app') ? ' [App Scope]' : '';
                 lbl.innerText = (names[m] || 'Standard Color') + scopeLabel;
             }
+            updateBlackoutWarningBanner();
 
             if (!fromPoll && window.pywebview && window.pywebview.api) {
                 try {
@@ -5160,7 +5247,7 @@
                     { v: "Cinema", l: "Cinema (5800K)" },
                     { v: "Gaming", l: "Gaming (6500K)" },
                     { v: "Bedtime", l: "Bedtime (2700K)" },
-                    { v: "Biohacker", l: "Ruby Night Vision (1000K)" }
+                    { v: "Biohacker", l: "Ruby Night Vision (0K)" }
                 ]}
             ];
 
@@ -5838,6 +5925,10 @@
                             const elLinkHw = document.getElementById('opt-disp-linkhw');
                             if (elLinkHw) elLinkHw.checked = !!cfg.screen.link_hardware_brightness;
                             document.getElementById('opt-disp-green').checked = !!cfg.screen.keep_background_green;
+                            isDeepCrimson = !!cfg.screen.deep_crimson;
+                            const chkCrimsonCfg = document.getElementById('chk-deep-crimson');
+                            if (chkCrimsonCfg) chkCrimsonCfg.checked = isDeepCrimson;
+                            updateBlackoutWarningBanner();
                             if (typeof cfg.screen.saturation === 'number') {
                                 const sSat = document.getElementById('slider-saturation');
                                 const vSat = document.getElementById('val-sat-hero');
@@ -5928,6 +6019,7 @@
             updateKelvinText(k);
             currentPresetKey = 'Circadian';
             updatePresetBadge();
+            updateBlackoutWarningBanner();
         };
 
         // =================================================================
@@ -6012,6 +6104,11 @@
                             });
                             if (typeof st.is_gray === 'boolean') isGray = st.is_gray;
                             if (typeof st.is_invert === 'boolean') isInvert = st.is_invert;
+                            if (typeof st.deep_crimson === 'boolean') {
+                                isDeepCrimson = st.deep_crimson;
+                                const chkCrimsonInit = document.getElementById('chk-deep-crimson');
+                                if (chkCrimsonInit) chkCrimsonInit.checked = isDeepCrimson;
+                            }
                             if (typeof st.circadian_active === 'boolean') {
                                 const cc = document.getElementById('chk-circadian');
                                 if (cc) cc.checked = st.circadian_active;
@@ -6042,6 +6139,7 @@
                                 });
                             }
                             updatePresetBadge();
+                            updateBlackoutWarningBanner();
                         } else {
                             if (Date.now() - lastUserSliderInteraction >= 800) {
                                 if (typeof st.current_k === 'number' && st.current_k !== currentK) {
@@ -6199,9 +6297,17 @@
                             const cc = document.getElementById('chk-circadian');
                             if (cc && cc.checked !== st.circadian_active) cc.checked = st.circadian_active;
                         }
-                        if (st.circadian_active && st.current_k && Math.abs(currentK - st.current_k) > 10) {
+                        if (st.circadian_active && typeof st.current_k === 'number' && Math.abs(currentK - st.current_k) > 10) {
                             window.onCircadianUpdate(st.current_k);
                         }
+                        if (typeof st.deep_crimson === 'boolean') {
+                            isDeepCrimson = st.deep_crimson;
+                            const chkCrimsonPoll = document.getElementById('chk-deep-crimson');
+                            if (chkCrimsonPoll && chkCrimsonPoll.checked !== isDeepCrimson) {
+                                chkCrimsonPoll.checked = isDeepCrimson;
+                            }
+                        }
+                        updateBlackoutWarningBanner();
 
                         if (st.active_break && st.active_break.id !== lastHandledBreakId) {
                             lastHandledBreakId = st.active_break.id;
@@ -6418,6 +6524,7 @@
         }
 
         function initApp() {
+            updateBlackoutWarningBanner();
             loadHotkeys();
             loadOptionsConfig();
             loadMagicConfig();
