@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://hocinechero.github.io/EyeGuard/"><img src="https://img.shields.io/badge/Website-EyeGuard-14b8a6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Official Website"></a>
-  <a href="https://github.com/hocinechero/EyeGuard/releases"><img src="https://img.shields.io/badge/Release-v3.0.0-14b8a6?style=for-the-badge&logo=github" alt="Release v3.0.0"></a>
+  <a href="https://github.com/hocinechero/EyeGuard/releases"><img src="https://img.shields.io/badge/Release-v3.1.0-14b8a6?style=for-the-badge&logo=github" alt="Release v3.1.0"></a>
   <a href="https://github.com/microsoft/winget-pkgs/pull/478905"><img src="https://img.shields.io/badge/Winget-hocinechero.EyeGuard-0078d4?style=for-the-badge&logo=windows-terminal&logoColor=white" alt="Winget Available"></a>
-  <a href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0"><img src="https://img.shields.io/badge/Checksums-SHA--256%20Verified-10b981?style=for-the-badge&logo=github" alt="SHA-256 Checksums (v3.0.0)"></a>
+  <a href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0"><img src="https://img.shields.io/badge/Checksums-SHA--256%20Verified-10b981?style=for-the-badge&logo=github" alt="SHA-256 Checksums (v3.1.0)"></a>
   <a href="https://alternativeto.net/software/eyeguard/"><img src="https://img.shields.io/badge/AlternativeTo-EyeGuard-1e88e5?style=for-the-badge" alt="AlternativeTo Listing"></a>
   <a href="https://github.com/hocinechero/EyeGuard"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0ea5e9?style=for-the-badge&logo=windows" alt="Windows 10 / 11"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-teal?style=for-the-badge" alt="MIT License"></a>
@@ -28,7 +28,7 @@
 
 <div align="center">
 
-### 🚀 Instant Downloads & Installation (Version 3.0.0)
+### 🚀 Instant Downloads & Installation (Version 3.1.0)
 
 🌐 **Official Website:** **[hocinechero.github.io/EyeGuard](https://hocinechero.github.io/EyeGuard/)**
 
@@ -39,14 +39,14 @@ winget install hocinechero.EyeGuard
 
 | Package | Description | Direct Download | SHA-256 Verification |
 | :--- | :--- | :---: | :---: |
-| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.zip) | [`4F30EA6B...A912D06`](https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0) |
-| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Setup.exe) | [`CF19D9AF...B6BF422F`](https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0) |
-| 🪟 **Winget Package** | Official Windows Package Manager distribution. Automatically tracked and updated. | `winget install hocinechero.EyeGuard` | Microsoft Pipeline |
+| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v3.1.0/EyeGuard_Portable.zip) | [`78F058A3...AD224283`](https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0) |
+| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.1.0/EyeGuard_Setup.exe) | [`99685D82...986566EA`](https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0) |
+| 🪟 **Winget Package** | Official Windows Package Manager distribution (`v3.1.0` manifest update pending). | `winget install hocinechero.EyeGuard` | Microsoft Pipeline |
 
-**v3.0.0 Release SHA-256 Checksums** ([GitHub Release](https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0)):
-- `EyeGuard_Portable.zip` (`29,136,907` bytes): `4F30EA6B187CF5DCE921D37447E6B700B3DB494190DC4A5C5163705D8A912D06`
-- `EyeGuard_Setup.exe` (`21,222,492` bytes): `CF19D9AF2DC4E24464B124774E707E0DC724595D0630B5F4B7E34564B6BF422F`
-- `EyeGuard-Source.zip` (`13,147,779` bytes): `EEFE5DC611C05F45D6AEE144FBB7B07B8B8BBFDD9B2E4050337160287F02E578`
+**v3.1.0 Release SHA-256 Checksums** ([GitHub Release](https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0)):
+- `EyeGuard_Portable.zip` (`29,136,912` bytes): `78F058A3293FCB5725EC7CB99193EFA8CAA41FBBDC30D35585AF44BAAD224283`
+- `EyeGuard_Setup.exe` (`21,229,997` bytes): `99685D825E8F0DBB3D4E99C1B42364F533E3E065A21E0518D7ED7C77986566EA`
+- `EyeGuard-Source.zip` (`13,147,787` bytes): `5209D3CBA0DEA5160D7A3CFAD6D5AEED1DEBC321514169946C1BF8D0B47F576A`
 
 </div>
 
@@ -71,7 +71,7 @@ Whether you are reading research papers in Adobe Acrobat, browsing long document
 
 ### 📊 How EyeGuard Compares
 
-| Feature | Windows Night Light | f.lux | CareUEyes (Paid) | 🛡️ **EyeGuard (v3.0.0)** |
+| Feature | Windows Night Light | f.lux | CareUEyes (Paid) | 🛡️ **EyeGuard (v3.1.0)** |
 | :--- | :---: | :---: | :---: | :---: |
 | **Line-by-Line Reading Ruler** | ❌ No | ❌ No | 💲 $20/yr | ✅ **Yes (Smooth Cursor Tracking)** |
 | **Paragraph Spotlight Focus Mask** | ❌ No | ❌ No | ❌ No | ✅ **Yes (Custom Width & Dimming)** |
