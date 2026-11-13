@@ -204,10 +204,11 @@ class EyeGuardGammaEngine:
         self.invert = False
         self.green_background = False
         self.deep_crimson: bool = False
+        self.tint_cursor: bool = True
         self.smooth_transition = True
         self.software_filter_mode = False
         self.standard_calibration_mode = True
-        self.software_mouse_cursor = False
+        self.software_mouse_cursor = True
 
         self._monitors_cache: List[Dict] = []
         self._last_monitor_check = 0.0
@@ -487,6 +488,7 @@ class EyeGuardGammaEngine:
         saturation_override: Optional[float] = None,
         green_bg_override: Optional[bool] = None,
         deep_crimson_override: Optional[bool] = None,
+        lut_scale: Optional[Tuple[float, float, float]] = None,
     ):
         """
         Applies GPU-composited 5x5 DWM Magnification matrix (MagSetFullscreenColorEffect).
@@ -524,6 +526,10 @@ class EyeGuardGammaEngine:
         mat = MAGCOLOREFFECT()
         lw = [0.299, 0.587, 0.114]
         rf, gf, bf = kelvin_to_rgb_extended(k_clamped)
+        if use_green_bg:
+            rf *= 0.78
+            gf *= 0.93
+            bf *= 0.80
 
         theme_info = AUTHENTIC_READING_THEMES.get(mode)
         if mode == "custom":
@@ -561,10 +567,6 @@ class EyeGuardGammaEngine:
                     mat.transform[4][c] = b_clamped * bias[c]
 
         else:
-            if use_green_bg:
-                rf *= 0.78
-                gf *= 0.93
-                bf *= 0.80
             rf *= b_clamped
             gf *= b_clamped
             bf *= b_clamped
@@ -600,6 +602,18 @@ class EyeGuardGammaEngine:
                 mat.transform[r][0] *= 0.78
                 mat.transform[r][1] = 0.0
                 mat.transform[r][2] = 0.0
+
+        if lut_scale is not None:
+            scales = [lut_scale[0], lut_scale[1], lut_scale[2]]
+            for c in range(3):
+                sc = scales[c]
+                if sc > 1e-6:
+                    inv_sc = 1.0 / sc
+                    for r in range(5):
+                        mat.transform[r][c] *= inv_sc
+                else:
+                    for r in range(5):
+                        mat.transform[r][c] = 0.0
 
         mat.transform[3][3] = 1.0
         mat.transform[4][4] = 1.0
@@ -659,10 +673,11 @@ class EyeGuardGammaEngine:
                 self._applied_brightness = 1.0
                 return
 
-            # Pure Hardware LUT path down to MIN_HARDWARE_FLOOR on capable WDDM drivers (0% DWM overhead),
-            # automatically stacking DWM Magnification only when driver clamps <20% or saturation < 100%.
-            if self._is_lut_eligible(mode, grayscale, invert, sat):
-                clamp_floor = self._should_clamp_lut_floor(target_monitor)
+            clamp_floor = self._should_clamp_lut_floor(target_monitor)
+
+            # Normal full-sat path (Normal mode, sat >= 0.99, not grayscale, not invert, not software_filter_mode)
+            # When self.tint_cursor is True: runs on 100% pure hardware_lut (0% DWM overhead)
+            if self.tint_cursor and (not self.software_filter_mode) and self._is_lut_eligible(mode, grayscale, invert, sat) and sat >= 0.99:
                 lut_b = max(self.LUT_SAFE_FLOOR, eff_b) if clamp_floor else eff_b
                 ramp = self._build_ramp(
                     k_val,
@@ -688,9 +703,12 @@ class EyeGuardGammaEngine:
                 if ramp_ok:
                     self._lut_active = True
                     needs_dwm_dim = lut_b > (eff_b + 1e-6)
-                    if (not needs_dwm_dim) and sat >= 0.99:
+                    if not needs_dwm_dim:
                         self._uninit_dwm()
                         self._active_backend = "hardware_lut"
+                        self._applied_kelvin = k_val
+                        self._applied_brightness = b_val
+                        return
                     else:
                         rem_b = max(self.MIN_HARDWARE_FLOOR, min(1.0, eff_b / max(self.MIN_HARDWARE_FLOOR, lut_b)))
                         self._apply_dwm_color_effect(
@@ -702,13 +720,78 @@ class EyeGuardGammaEngine:
                             saturation_override=sat,
                             green_bg_override=False,
                             deep_crimson_override=False,
+                            lut_scale=None,
                         )
                         self._active_backend = "hybrid_lut_dwm"
+                        self._applied_kelvin = k_val
+                        self._applied_brightness = b_val
+                        return
+
+            # Generalized Hybrid LUT+DWM (Themes, Invert, Grayscale, sat < 1.0, or sub-20% dimming)
+            # Tints hardware cursor across ALL modes by loading peak ambient tone into GPU LUT
+            # and normalizing DWM color matrix by the LUT scale.
+            if self.tint_cursor and (not self.software_filter_mode):
+                rf, gf, bf = kelvin_to_rgb_extended(k_val)
+                if self.green_background:
+                    rf *= 0.78
+                    gf *= 0.93
+                    bf *= 0.80
+
+                base_rgb = [0.78, 0.0, 0.0] if self.deep_crimson else [rf, gf, bf]
+
+                theme_info = AUTHENTIC_READING_THEMES.get(mode)
+                if mode == "custom":
+                    bg = parse_color_hex(self.custom_bg_hex, [1.0, 1.0, 1.0])
+                    txt = parse_color_hex(self.custom_txt_hex, [0.0, 0.0, 0.0])
+                    peak_rgb = [max(bg[c], txt[c]) * base_rgb[c] * eff_b for c in range(3)]
+                elif theme_info and not theme_info.get("is_normal"):
+                    if theme_info.get("e_ink"):
+                        peak_rgb = [base_rgb[c] * eff_b for c in range(3)]
+                    else:
+                        bg = list(theme_info.get("bg", [1.0, 1.0, 1.0]))
+                        txt = list(theme_info.get("txt", [0.0, 0.0, 0.0]))
+                        peak_rgb = [max(bg[c], txt[c]) * base_rgb[c] * eff_b for c in range(3)]
+                else:
+                    # e_ink, invert, grayscale, normal+sat<1
+                    peak_rgb = [base_rgb[c] * eff_b for c in range(3)]
+
+                floor_val = self.LUT_SAFE_FLOOR if clamp_floor else self.MIN_HARDWARE_FLOOR
+                lut_rgb = [
+                    0.0 if peak_rgb[c] <= 0.0 else max(floor_val, min(1.0, peak_rgb[c]))
+                    for c in range(3)
+                ]
+
+                # Note: When deep_crimson=True with DWM modes (invert/themes), LUT is linear (peak_r, 0, 0)
+                ramp = self._build_rgb_ramp(lut_rgb[0], lut_rgb[1], lut_rgb[2], deep_crimson=False)
+                ramp_ok = self._apply_ramp(ramp, target_monitor)
+                if (not ramp_ok) and self._should_clamp_lut_floor(target_monitor):
+                    lut_rgb = [
+                        0.0 if peak_rgb[c] <= 0.0 else max(self.LUT_SAFE_FLOOR, min(1.0, peak_rgb[c]))
+                        for c in range(3)
+                    ]
+                    ramp = self._build_rgb_ramp(lut_rgb[0], lut_rgb[1], lut_rgb[2], deep_crimson=False)
+                    ramp_ok = self._apply_ramp(ramp, target_monitor)
+
+                if ramp_ok:
+                    self._lut_active = True
+                    self._apply_dwm_color_effect(
+                        k_val,
+                        eff_b,
+                        grayscale,
+                        invert,
+                        color_mode=mode,
+                        saturation_override=sat,
+                        green_bg_override=self.green_background,
+                        deep_crimson_override=self.deep_crimson,
+                        lut_scale=(lut_rgb[0], lut_rgb[1], lut_rgb[2]),
+                    )
+                    self._active_backend = "hybrid_lut_dwm"
                     self._applied_kelvin = k_val
                     self._applied_brightness = b_val
                     return
 
-            # Full Software DWM fallback (Reading themes, Invert, Grayscale, software_filter_mode, or LUT blocked)
+            # Full Software DWM fallback (tint_cursor=False, software_filter_mode=True, or LUT blocked by driver)
+            # Hardware LUT is restored to 100% linear, rendering Windows hardware cursor crisp un-tinted white.
             if self._lut_active:
                 self._restore_original_hardware_lut(target_monitor)
             self._apply_dwm_color_effect(
@@ -718,6 +801,7 @@ class EyeGuardGammaEngine:
                 invert,
                 color_mode=mode,
                 deep_crimson_override=self.deep_crimson,
+                lut_scale=None,
             )
             self._active_backend = "software_dwm"
             self._applied_kelvin = k_val
@@ -966,6 +1050,36 @@ class EyeGuardGammaEngine:
                     self._hw_worker_running = False
                     break
 
+    def _build_rgb_ramp(
+        self,
+        rf: float,
+        gf: float,
+        bf: float,
+        deep_crimson: bool = False,
+        invert: bool = False,
+        grayscale: bool = False,
+    ) -> GAMMA_RAMP:
+        ramp = GAMMA_RAMP()
+        for i in range(256):
+            val = (255 - i) / 255.0 if invert else (i / 255.0)
+            if deep_crimson:
+                shaped = (val ** 1.55) * 0.78
+                red_word = int(max(0, min(65535, round(shaped * 65535.0 * rf))))
+                ramp.Red[i] = red_word
+                ramp.Green[i] = 0
+                ramp.Blue[i] = 0
+            elif grayscale:
+                gray = val * (0.299 * rf + 0.587 * gf + 0.114 * bf)
+                word_val = int(max(0, min(65535, round(gray * 65535.0))))
+                ramp.Red[i] = word_val
+                ramp.Green[i] = word_val
+                ramp.Blue[i] = word_val
+            else:
+                ramp.Red[i] = int(max(0, min(65535, round(val * 65535.0 * rf))))
+                ramp.Green[i] = int(max(0, min(65535, round(val * 65535.0 * gf))))
+                ramp.Blue[i] = int(max(0, min(65535, round(val * 65535.0 * bf))))
+        return ramp
+
     def _build_ramp(
         self,
         kelvin: float,
@@ -988,26 +1102,10 @@ class EyeGuardGammaEngine:
         gf *= b
         bf *= b
 
-        ramp = GAMMA_RAMP()
-        for i in range(256):
-            val = (255 - i) / 255.0 if invert else (i / 255.0)
-            if use_crimson:
-                shaped = (val ** 1.55) * 0.78
-                red_word = int(max(0, min(65535, round(shaped * 65535.0 * b))))
-                ramp.Red[i] = red_word
-                ramp.Green[i] = 0
-                ramp.Blue[i] = 0
-            elif grayscale:
-                gray = val * (0.299 * rf + 0.587 * gf + 0.114 * bf)
-                word_val = int(max(0, min(65535, round(gray * 65535.0))))
-                ramp.Red[i] = word_val
-                ramp.Green[i] = word_val
-                ramp.Blue[i] = word_val
-            else:
-                ramp.Red[i] = int(max(0, min(65535, round(val * 65535.0 * rf))))
-                ramp.Green[i] = int(max(0, min(65535, round(val * 65535.0 * gf))))
-                ramp.Blue[i] = int(max(0, min(65535, round(val * 65535.0 * bf))))
-        return ramp
+        if use_crimson:
+            return self._build_rgb_ramp(b, 0.0, 0.0, deep_crimson=True, invert=invert, grayscale=grayscale)
+
+        return self._build_rgb_ramp(rf, gf, bf, deep_crimson=False, invert=invert, grayscale=grayscale)
 
     def _apply_ramp_to_hdc(
         self,
@@ -1217,6 +1315,19 @@ class EyeGuardGammaEngine:
     def set_deep_crimson(self, enabled: bool):
         """Toggles pure-hardware-LUT Deep Crimson mode (G=0/B=0, non-linear glare taming)."""
         self.deep_crimson = bool(enabled)
+        return self.set_display(
+            self._current_kelvin,
+            self._current_brightness * 100.0,
+            grayscale=self.grayscale,
+            invert=self.invert,
+            smooth=False,
+            color_mode=self.color_mode,
+        )
+
+    def set_tint_cursor(self, enabled: bool):
+        """Sets whether the hardware mouse cursor is tinted to match the active screen filter/theme."""
+        self.tint_cursor = bool(enabled)
+        self.software_mouse_cursor = self.tint_cursor
         return self.set_display(
             self._current_kelvin,
             self._current_brightness * 100.0,

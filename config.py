@@ -25,7 +25,8 @@ DEFAULT_CONFIG = {
         "standard_calibration_mode": True,
         "software_mouse_cursor": False,
         "keep_background_green": False,
-        "deep_crimson": False
+        "deep_crimson": False,
+        "tint_cursor": True
     },
     "presets": {
         "Health": {"kelvin": 5000, "brightness": 85},
@@ -215,6 +216,7 @@ class ConfigManager:
             scr["grayscale"] = bool(scr.get("grayscale", False))
             scr["invert"] = bool(scr.get("invert", False))
             scr["deep_crimson"] = bool(scr.get("deep_crimson", False))
+            scr["tint_cursor"] = bool(scr.get("tint_cursor", True))
             if "general" in config and isinstance(config["general"], dict):
                 config["general"]["language"] = "en"
             if "timer" in config and isinstance(config["timer"], dict):

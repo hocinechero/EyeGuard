@@ -2129,14 +2129,24 @@
                     </div>
                 </div>
 
-                <div class="hero-metric-card" style="padding: 8px 12px; margin-bottom: 0;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <div class="hero-metric-card" style="padding: 4px 12px; margin-bottom: 0;">
+                    <div class="form-row" style="padding: 6px 0;">
                         <div>
                             <div class="metric-title" id="t-crimson-title" style="font-size: 12px; color: #f87171;">Deep Crimson Filter (Ruby+)</div>
                             <div id="t-crimson-desc" style="font-size: 10px; color: var(--text-secondary);">Pure G=0/B=0 signal with deep gamma shaping to tame white-page glare</div>
                         </div>
                         <label class="toggle-switch">
                             <input type="checkbox" id="chk-deep-crimson" onchange="toggleDeepCrimson(this.checked)">
+                            <span class="toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="form-row" style="padding: 6px 0;">
+                        <div>
+                            <div class="metric-title" id="t-tint-cursor-title" style="font-size: 12px; color: var(--accent-teal);">Tint Mouse Cursor with Screen</div>
+                            <div id="t-tint-cursor-desc" style="font-size: 10px; color: var(--text-secondary);">Matches cursor color across all filters &amp; reading themes (uncheck to keep white cursor)</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="chk-tint-cursor" checked onchange="toggleTintCursor(this.checked)">
                             <span class="toggle-track"></span>
                         </label>
                     </div>
@@ -3176,8 +3186,8 @@
                         </div>
 
                         <div class="form-row">
-                            <span class="form-label">Enable software mouse cursor</span>
-                            <input type="checkbox" id="opt-disp-cursor" onchange="saveDisplayOptionsSubtab()">
+                            <span class="form-label" id="lbl-opt-disp-cursor">Tint Mouse Cursor with Screen</span>
+                            <input type="checkbox" id="opt-disp-cursor" checked onchange="saveDisplayOptionsSubtab()">
                         </div>
 
                         <div class="form-row">
@@ -3348,6 +3358,7 @@
         let isGray = false;
         let isInvert = false;
         let isDeepCrimson = false;
+        let isTintCursor = true;
         let currentColorFilterMode = 'normal';
         let isRuler = false;
         let isTimerPaused = true;
@@ -3391,6 +3402,8 @@
                 invertDesc: "GPU-level smart dark mode inverting white surfaces without blooming",
                 crimsonTitle: "فلتر الأحمر القاني العميق (Ruby+)",
                 crimsonDesc: "إغلاق تام للأخضر والأزرق مع تعميق جاما الأحمر لتخفيف وهج الخلفيات البيضاء",
+                tintCursorTitle: "تلوين مؤشر الفأرة مع الشاشة",
+                tintCursorDesc: "يلوّن المؤشر تلقائياً مع جميع الأوضاع وثيمات القراءة (ألغِ التحديد لإبقائه أبيض)",
                 blackoutWarnTitle: "تحذير شاشة سوداء: Terminal Green + 0K / Deep Crimson",
                 blackoutWarnDesc: "دمج سمة Terminal Green مع درجة 0K أو Deep Crimson يصفّر جميع القنوات اللونية (R=0, G=0, B=0) فتصبح الشاشة سوداء تماماً. ارجع إلى Normal أو ارفع درجة الكلفن / أطفئ Deep Crimson.",
                 terminalHintText: "تنبيه: 0K / Deep Crimson مفعّل حالياً — اختيار Terminal Green أو Xodo Terminal سيجعل الشاشة سوداء تماماً (R=0, G=0, B=0).",
@@ -3501,6 +3514,8 @@
                 invertDesc: "GPU-level smart dark mode inverting white surfaces without blooming",
                 crimsonTitle: "Deep Crimson Filter (Ruby+)",
                 crimsonDesc: "Pure G=0/B=0 signal with deep gamma shaping to tame white-page glare",
+                tintCursorTitle: "Tint Mouse Cursor with Screen",
+                tintCursorDesc: "Matches cursor color across all filters & reading themes (uncheck to keep white cursor)",
                 blackoutWarnTitle: "Blackout Warning: Terminal Green + 0K / Deep Crimson",
                 blackoutWarnDesc: "Combining Terminal Green with 0K or Deep Crimson zeroes all RGB channels (R=0, G=0, B=0) and turns the screen completely black. Switch back to Normal, raise Kelvin, or turn Deep Crimson off.",
                 terminalHintText: "Notice: 0K / Deep Crimson is currently active — selecting Terminal Green or Xodo Terminal will turn the screen completely black (R=0, G=0, B=0).",
@@ -3963,6 +3978,9 @@
             setTxt('t-invert-desc', d.invertDesc);
             setTxt('t-crimson-title', d.crimsonTitle);
             setTxt('t-crimson-desc', d.crimsonDesc);
+            setTxt('t-tint-cursor-title', d.tintCursorTitle);
+            setTxt('t-tint-cursor-desc', d.tintCursorDesc);
+            setTxt('lbl-opt-disp-cursor', d.tintCursorTitle);
 
             setTxt('timer-sub-label', d.timerSubLabel);
             setTxt('btn-timer-action', isTimerPaused ? d.btnTimerResume : d.btnTimerPause);
@@ -4199,6 +4217,19 @@
             if (window.pywebview && window.pywebview.api && window.pywebview.api.set_deep_crimson) {
                 try {
                     await window.pywebview.api.set_deep_crimson(isDeepCrimson);
+                } catch (e) {}
+            }
+        }
+
+        async function toggleTintCursor(enabled) {
+            isTintCursor = !!enabled;
+            const chkMain = document.getElementById('chk-tint-cursor');
+            if (chkMain && chkMain.checked !== isTintCursor) chkMain.checked = isTintCursor;
+            const chkOpt = document.getElementById('opt-disp-cursor');
+            if (chkOpt && chkOpt.checked !== isTintCursor) chkOpt.checked = isTintCursor;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_tint_cursor) {
+                try {
+                    await window.pywebview.api.set_tint_cursor(isTintCursor);
                 } catch (e) {}
             }
         }
@@ -5775,11 +5806,16 @@
                 }
             }
             const linkHwEl = document.getElementById('opt-disp-linkhw');
+            const tintCursorVal = document.getElementById('opt-disp-cursor').checked;
+            isTintCursor = tintCursorVal;
+            const chkMainCursor = document.getElementById('chk-tint-cursor');
+            if (chkMainCursor && chkMainCursor.checked !== tintCursorVal) chkMainCursor.checked = tintCursorVal;
             const payload = {
                 smooth_transition: document.getElementById('opt-disp-smooth').checked,
                 software_filter_mode: document.getElementById('opt-disp-swfilter').checked,
                 standard_calibration_mode: document.getElementById('opt-disp-stdcal').checked,
-                software_mouse_cursor: document.getElementById('opt-disp-cursor').checked,
+                tint_cursor: tintCursorVal,
+                software_mouse_cursor: tintCursorVal,
                 unlock_extended_range: document.getElementById('chk-ext-range').checked,
                 wider_brightness_range: wideBright,
                 link_hardware_brightness: linkHwEl ? linkHwEl.checked : false,
@@ -5917,7 +5953,10 @@
                             document.getElementById('opt-disp-smooth').checked = cfg.screen.smooth_transition !== false;
                             document.getElementById('opt-disp-swfilter').checked = !!cfg.screen.software_filter_mode;
                             document.getElementById('opt-disp-stdcal').checked = cfg.screen.standard_calibration_mode !== false;
-                            document.getElementById('opt-disp-cursor').checked = !!cfg.screen.software_mouse_cursor;
+                            isTintCursor = cfg.screen.tint_cursor !== false;
+                            document.getElementById('opt-disp-cursor').checked = isTintCursor;
+                            const chkMainCursorCfg = document.getElementById('chk-tint-cursor');
+                            if (chkMainCursorCfg) chkMainCursorCfg.checked = isTintCursor;
                             const wideB = cfg.screen.wider_brightness_range !== false;
                             document.getElementById('opt-disp-widebright').checked = wideB;
                             const sBright = document.getElementById('slider-bright');
@@ -6108,6 +6147,13 @@
                                 isDeepCrimson = st.deep_crimson;
                                 const chkCrimsonInit = document.getElementById('chk-deep-crimson');
                                 if (chkCrimsonInit) chkCrimsonInit.checked = isDeepCrimson;
+                            }
+                            if (typeof st.tint_cursor === 'boolean') {
+                                isTintCursor = st.tint_cursor;
+                                const chkCursorInit = document.getElementById('chk-tint-cursor');
+                                if (chkCursorInit) chkCursorInit.checked = isTintCursor;
+                                const chkOptCursorInit = document.getElementById('opt-disp-cursor');
+                                if (chkOptCursorInit) chkOptCursorInit.checked = isTintCursor;
                             }
                             if (typeof st.circadian_active === 'boolean') {
                                 const cc = document.getElementById('chk-circadian');
@@ -6305,6 +6351,17 @@
                             const chkCrimsonPoll = document.getElementById('chk-deep-crimson');
                             if (chkCrimsonPoll && chkCrimsonPoll.checked !== isDeepCrimson) {
                                 chkCrimsonPoll.checked = isDeepCrimson;
+                            }
+                        }
+                        if (typeof st.tint_cursor === 'boolean') {
+                            isTintCursor = st.tint_cursor;
+                            const chkCursorPoll = document.getElementById('chk-tint-cursor');
+                            if (chkCursorPoll && chkCursorPoll.checked !== isTintCursor) {
+                                chkCursorPoll.checked = isTintCursor;
+                            }
+                            const chkOptCursorPoll = document.getElementById('opt-disp-cursor');
+                            if (chkOptCursorPoll && chkOptCursorPoll.checked !== isTintCursor) {
+                                chkOptCursorPoll.checked = isTintCursor;
                             }
                         }
                         updateBlackoutWarningBanner();

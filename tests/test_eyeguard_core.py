@@ -217,17 +217,26 @@ class TestHybridDisplayEngine(unittest.TestCase):
         self.assertAlmostEqual(last_mat["mat"].transform[0][0], expected_eff, delta=0.01)
 
     def test_grayscale_and_invert_wired_in_dwm_matrix(self):
-        eng, _, last_mat, _, _ = self._make_mocked_engine()
+        eng, last_ramp, last_mat, _, _ = self._make_mocked_engine()
+        # Default tint_cursor=True uses hybrid_lut_dwm (LUT tints cursor, DWM normalizes by LUT)
         eng.set_display(6500, 80, grayscale=True, invert=True, smooth=False, color_mode="normal")
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
+        expected_eff = 0.80 ** eng.PERCEPTUAL_DIM_EXPONENT
+        self.assertAlmostEqual(last_ramp["ramp"].Red[255] / 65535.0, expected_eff, delta=0.01)
+        m = last_mat["mat"].transform
+        self.assertAlmostEqual(m[4][0], 1.0, delta=0.01)
+        self.assertLess(m[0][0], -0.25)
+        self.assertAlmostEqual(m[0][0] + m[1][0] + m[2][0] + m[4][0], 0.0, delta=0.02)
+
+        # tint_cursor=False switches to software_dwm (linear LUT -> white cursor, full dim in DWM)
+        eng.set_tint_cursor(False)
         self.assertTrue(eng.wait_idle(2.0))
         self.assertEqual(eng.get_active_backend(), "software_dwm")
         m = last_mat["mat"].transform
-        # White input (1,1,1) maps to ~0 black, black input (0,0,0) maps to perceptual 80% white
-        expected_eff = 0.80 ** eng.PERCEPTUAL_DIM_EXPONENT
         self.assertAlmostEqual(m[4][0], expected_eff, delta=0.01)
         self.assertLess(m[0][0], -0.20)
-        out_white = m[0][0] + m[1][0] + m[2][0] + m[4][0]
-        self.assertAlmostEqual(out_white, 0.0, delta=0.02)
+        self.assertAlmostEqual(m[0][0] + m[1][0] + m[2][0] + m[4][0], 0.0, delta=0.02)
 
     def test_saturation_zero_uses_hybrid_lut_plus_dwm_and_perceptual_dimming(self):
         eng, last_ramp, last_mat, _, mock_mag = self._make_mocked_engine()
@@ -251,13 +260,18 @@ class TestHybridDisplayEngine(unittest.TestCase):
         eng, _, last_mat, _, mock_mag = self._make_mocked_engine()
         eng.set_display(4500, 75, smooth=False, color_mode="custom")
         self.assertTrue(eng.wait_idle(2.0))
-        self.assertEqual(eng.get_active_backend(), "software_dwm")
+        self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
         self.assertTrue(mock_mag.MagInitialize.called)
+
+        eng.set_tint_cursor(False)
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "software_dwm")
 
         eng.reset()
         self.assertTrue(eng.wait_idle(2.0))
         self.assertEqual(eng.color_mode, "normal")
         self.assertEqual(eng.get_active_backend(), "identity")
+        self.assertFalse(eng.tint_cursor)
         self.assertTrue(mock_mag.MagUninitialize.called)
 
     def test_deep_crimson_pure_hardware_lut_and_reset(self):
@@ -294,21 +308,35 @@ class TestHybridDisplayEngine(unittest.TestCase):
         self.assertEqual(eng.get_active_backend(), "identity")
 
     def test_deep_crimson_with_invert_uses_dwm_matrix(self):
-        eng, _, last_mat, _, mock_mag = self._make_mocked_engine()
+        eng, last_ramp, last_mat, _, mock_mag = self._make_mocked_engine()
         eng.set_deep_crimson(True)
         eng.set_display(6500, 80, invert=True, smooth=False, color_mode="normal")
         self.assertTrue(eng.wait_idle(2.0))
-        self.assertEqual(eng.get_active_backend(), "software_dwm")
+        self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
         self.assertTrue(mock_mag.MagSetFullscreenColorEffect.called)
+        expected_eff = 0.80 ** eng.PERCEPTUAL_DIM_EXPONENT
+        self.assertAlmostEqual(last_ramp["ramp"].Red[255] / 65535.0, 0.78 * expected_eff, delta=0.01)
+        self.assertEqual(last_ramp["ramp"].Green[255], 0)
+        self.assertEqual(last_ramp["ramp"].Blue[255], 0)
         m = last_mat["mat"].transform
         for r in range(5):
             self.assertEqual(m[r][1], 0.0)
             self.assertEqual(m[r][2], 0.0)
-        expected_eff = 0.80 ** eng.PERCEPTUAL_DIM_EXPONENT
+        self.assertAlmostEqual(m[0][0], -1.0, delta=0.02)
+        self.assertAlmostEqual(m[4][0], 1.0, delta=0.02)
+        self.assertAlmostEqual(m[0][0] + m[1][0] + m[2][0] + m[4][0], 0.0, delta=0.02)
+
+        # With tint_cursor=False: software_dwm applies 0.78*eff_b in DWM, hardware LUT restored
+        eng.set_tint_cursor(False)
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "software_dwm")
+        m = last_mat["mat"].transform
+        for r in range(5):
+            self.assertEqual(m[r][1], 0.0)
+            self.assertEqual(m[r][2], 0.0)
         self.assertAlmostEqual(m[0][0], -0.78 * expected_eff, delta=0.01)
         self.assertAlmostEqual(m[4][0], 0.78 * expected_eff, delta=0.01)
-        out_white_r = m[0][0] + m[1][0] + m[2][0] + m[4][0]
-        self.assertAlmostEqual(out_white_r, 0.0, delta=0.02)
+        self.assertAlmostEqual(m[0][0] + m[1][0] + m[2][0] + m[4][0], 0.0, delta=0.02)
 
     def test_deep_crimson_hybrid_lut_dwm_does_not_double_attenuate(self):
         eng, last_ramp, last_mat, _, mock_mag = self._make_mocked_engine()
@@ -326,6 +354,68 @@ class TestHybridDisplayEngine(unittest.TestCase):
         # DWM must not re-apply 0.78 on top of LUT's 0.78; white input R gain stays 1.0
         out_white_r = m[0][0] + m[1][0] + m[2][0] + m[4][0]
         self.assertAlmostEqual(out_white_r, 1.0, delta=0.02)
+
+    def test_tint_cursor_across_themes_and_zero_kelvin(self):
+        eng, last_ramp, last_mat, _, _ = self._make_mocked_engine()
+        self.assertTrue(eng.tint_cursor)
+
+        # Sepia + green_background: no DWM matrix output > 1.0 (no highlight clipping)
+        eng.green_background = True
+        eng.set_display(5000, 80, smooth=False, color_mode="sepia")
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
+        m = last_mat["mat"].transform
+        for c in range(3):
+            out_white_c = m[0][c] + m[1][c] + m[2][c] + m[4][c]
+            self.assertLessEqual(out_white_c, 1.005)
+        eng.green_background = False
+
+        # Twilight dark theme: LUT uses max(bg, txt) so bright text is never clipped
+        eng.set_display(5000, 80, smooth=False, color_mode="twilight")
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
+        m = last_mat["mat"].transform
+        for c in range(3):
+            out_white_c = m[0][c] + m[1][c] + m[2][c] + m[4][c]
+            self.assertLessEqual(out_white_c, 1.005)
+
+        # Terminal Green (console & xodo_console) at 5000K: LUT R=0, G>0; DWM col 0 == 0
+        for mode in ("console", "xodo_console"):
+            eng.set_display(5000, 80, smooth=False, color_mode=mode)
+            self.assertTrue(eng.wait_idle(2.0))
+            self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
+            self.assertEqual(last_ramp["ramp"].Red[255], 0)
+            self.assertGreater(last_ramp["ramp"].Green[255], 0)
+            m = last_mat["mat"].transform
+            for r in range(5):
+                self.assertEqual(m[r][0], 0.0)
+            if mode == "console":
+                self.assertEqual(last_ramp["ramp"].Blue[255], 0)
+                for r in range(5):
+                    self.assertEqual(m[r][2], 0.0)
+            else:
+                # xodo_console uses txt=[0, 1.0, 0.4] (cyan-tinted terminal green)
+                self.assertGreater(last_ramp["ramp"].Blue[255], 0)
+                self.assertLessEqual(m[0][2] + m[1][2] + m[2][2] + m[4][2], 1.005)
+
+        # Terminal Green + 0K: peak=[0,0,0] safely sets LUT=(0,0,0) with zero-division safety
+        eng.set_display(0, 80, smooth=False, color_mode="console")
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "hybrid_lut_dwm")
+        self.assertEqual(last_ramp["ramp"].Red[255], 0)
+        self.assertEqual(last_ramp["ramp"].Green[255], 0)
+        self.assertEqual(last_ramp["ramp"].Blue[255], 0)
+
+        # Toggling tint_cursor=False switches to software_dwm
+        eng.set_tint_cursor(False)
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertEqual(eng.get_active_backend(), "software_dwm")
+
+        # reset() preserves tint_cursor preference
+        eng.set_tint_cursor(True)
+        eng.reset()
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertTrue(eng.tint_cursor)
 
     def test_crash_guard_cmd_frozen_uses_flag(self):
         eng, _, _, _, _ = self._make_mocked_engine()
@@ -473,10 +563,15 @@ class TestConfigCircadianAndBindings(unittest.TestCase):
                 self.assertTrue(mock_eng.green_background)
                 self.assertTrue(mock_eng.deep_crimson)
 
+                eg.set_tint_cursor(False)
+                self.assertFalse(eg.tint_cursor)
+                mock_eng.set_tint_cursor.assert_called_with(False)
+
                 res = eg.reset_natural()
                 self.assertEqual(res, {"kelvin": 6500, "brightness": 100, "mode": "normal", "deep_crimson": False})
                 self.assertFalse(eg.is_deep_crimson)
                 self.assertFalse(mock_eng.deep_crimson)
+                self.assertFalse(eg.tint_cursor)  # persistent preference preserved across reset_natural
                 eg.desktop_overlays.hide_toast.assert_called()
 
 

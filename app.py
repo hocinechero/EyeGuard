@@ -299,6 +299,7 @@ class EyeGuardApp:
         self.is_gray = bool(scr_cfg.get("grayscale", False))
         self.is_invert = bool(scr_cfg.get("invert", False))
         self.is_deep_crimson = bool(scr_cfg.get("deep_crimson", False))
+        self.tint_cursor = bool(scr_cfg.get("tint_cursor", True))
         self.color_filter_mode = str(scr_cfg.get("color_filter_mode", "normal"))
         if self.color_filter_mode in ("day", "standard"):
             self.color_filter_mode = "normal" 
@@ -306,6 +307,7 @@ class EyeGuardApp:
         self.gamma_engine.saturation = max(0.0, min(1.0, self.current_sat / 100.0))
         self.gamma_engine.green_background = bool(scr_cfg.get("keep_background_green", False))
         self.gamma_engine.deep_crimson = self.is_deep_crimson
+        self.gamma_engine.tint_cursor = self.tint_cursor
         self.gamma_engine.smooth_transition = bool(scr_cfg.get("smooth_transition", True))
         self.gamma_engine.software_filter_mode = bool(scr_cfg.get("software_filter_mode", False))
         self.gamma_engine.standard_calibration_mode = bool(scr_cfg.get("standard_calibration_mode", True))
@@ -1063,6 +1065,12 @@ class EyeGuardApp:
         self._schedule_tray_update()
         return {"deep_crimson": self.is_deep_crimson}
 
+    def set_tint_cursor(self, enabled: bool):
+        self.tint_cursor = bool(enabled)
+        self.config_mgr.set("screen", "tint_cursor", self.tint_cursor)
+        self.gamma_engine.set_tint_cursor(self.tint_cursor)
+        return {"tint_cursor": self.tint_cursor}
+
     # --- Focus Engine (Reading Focus + Spotlight Focus) ---
     def toggle_focus_ruler(self):
         self.focus_ruler.toggle()
@@ -1725,6 +1733,7 @@ class EyeGuardApp:
             "is_gray": self.is_gray,
             "is_invert": self.is_invert,
             "deep_crimson": bool(getattr(self, "is_deep_crimson", False)),
+            "tint_cursor": bool(getattr(self, "tint_cursor", True)),
             "filter_temp_disabled": self._filter_disabled_until_ts is not None,
             "circadian_active": self.circadian_active,
             "timer_enabled": st_data["enabled"],
@@ -1868,11 +1877,20 @@ class EyeGuardApp:
             if v is not None:
                 self.config_mgr.set("screen", k, v)
         scr = self.config_mgr.get("screen", default={}) or {}
+        if "tint_cursor" in kwargs and kwargs["tint_cursor"] is not None:
+            self.tint_cursor = bool(kwargs["tint_cursor"])
+            self.config_mgr.set("screen", "tint_cursor", self.tint_cursor)
+        elif "software_mouse_cursor" in kwargs and kwargs["software_mouse_cursor"] is not None:
+            self.tint_cursor = bool(kwargs["software_mouse_cursor"])
+            self.config_mgr.set("screen", "tint_cursor", self.tint_cursor)
+        else:
+            self.tint_cursor = bool(scr.get("tint_cursor", True))
         self.gamma_engine.green_background = bool(scr.get("keep_background_green", False))
         self.gamma_engine.smooth_transition = bool(scr.get("smooth_transition", True))
         self.gamma_engine.software_filter_mode = bool(scr.get("software_filter_mode", False))
         self.gamma_engine.standard_calibration_mode = bool(scr.get("standard_calibration_mode", True))
         self.gamma_engine.software_mouse_cursor = bool(scr.get("software_mouse_cursor", False))
+        self.gamma_engine.tint_cursor = self.tint_cursor
         self.gamma_engine.reset_lut_capability_cache()
         self.current_k = max(self._get_min_kelvin(), min(6500, self.current_k))
         self.current_b = max(self._get_min_brightness(), min(100, self.current_b))
@@ -2157,6 +2175,9 @@ class JSBridgeApi:
 
     def set_deep_crimson(self, enabled):
         return self._app.set_deep_crimson(bool(enabled))
+
+    def set_tint_cursor(self, enabled):
+        return self._app.set_tint_cursor(bool(enabled))
 
     def toggle_extended_range(self, enable):
         en = bool(enable)
