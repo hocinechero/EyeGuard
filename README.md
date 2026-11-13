@@ -179,8 +179,8 @@ Automatically synchronizes screen warmth with your local sun:
 ### 1. Screen & Color Calibration Center (`0K` Darkroom, Deep Crimson &amp; Cursor Tinting)
 <img src="assets/screenshots/dashboard.png" alt="EyeGuard Main Dashboard over PDF" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
-### 2. Live Warm PDF Protection (`2402K` Bedtime Warmth in Foxit Reader)
-<img src="assets/screenshots/warm_reading_pdf.png" alt="EyeGuard Warming Foxit PDF Reader" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+### 2. Live Warm PDF Protection (`4000K` Focused Reading Mode)
+<img src="assets/screenshots/warm_reading_pdf.png" alt="EyeGuard 4000K Focused Reading Mode over PDF" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
 ### 3. Dedicated Reading & Focus Suite (Reading Ruler, Spotlight &amp; 22 Themes)
 <img src="assets/screenshots/reading_modes.png" alt="EyeGuard Reading & Focus Suite" width="94%" style="border-radius:10px; margin-bottom: 24px;">
