@@ -15,7 +15,7 @@
   <a href="https://hocinechero.github.io/EyeGuard/"><img src="https://img.shields.io/badge/Website-EyeGuard-14b8a6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Official Website"></a>
   <a href="https://github.com/hocinechero/EyeGuard/releases"><img src="https://img.shields.io/badge/Release-v3.0.0-14b8a6?style=for-the-badge&logo=github" alt="Release v3.0.0"></a>
   <a href="https://github.com/microsoft/winget-pkgs/pull/478905"><img src="https://img.shields.io/badge/Winget-hocinechero.EyeGuard-0078d4?style=for-the-badge&logo=windows-terminal&logoColor=white" alt="Winget Available"></a>
-  <a href="https://www.virustotal.com/gui/file/88eb7509826c64ce164159e0e1cb84202cec6ad9ae6dae394f7e4366f9a57c93"><img src="https://img.shields.io/badge/VirusTotal-0%2F66%20Clean-10b981?style=for-the-badge&logo=virustotal&logoColor=white" alt="VirusTotal 0/66 Clean"></a>
+  <a href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0"><img src="https://img.shields.io/badge/Checksums-SHA--256%20Verified-10b981?style=for-the-badge&logo=github" alt="SHA-256 Checksums (v3.0.0)"></a>
   <a href="https://alternativeto.net/software/eyeguard/"><img src="https://img.shields.io/badge/AlternativeTo-EyeGuard-1e88e5?style=for-the-badge" alt="AlternativeTo Listing"></a>
   <a href="https://github.com/hocinechero/EyeGuard"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0ea5e9?style=for-the-badge&logo=windows" alt="Windows 10 / 11"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-teal?style=for-the-badge" alt="MIT License"></a>
@@ -37,11 +37,16 @@
 winget install hocinechero.EyeGuard
 ```
 
-| Package | Description | Direct Download | Security Scan |
+| Package | Description | Direct Download | SHA-256 Verification |
 | :--- | :--- | :---: | :---: |
-| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.zip) | [🛡️ **0/66 Clean**](https://www.virustotal.com/gui/file/88eb7509826c64ce164159e0e1cb84202cec6ad9ae6dae394f7e4366f9a57c93) |
-| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Setup.exe) | [🛡️ **70/71 Clean**](https://www.virustotal.com/gui/file/a92a05f6c87fc4015f665b97c54f65abeb1652d21efd61b7d729966342c3e784) |
+| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Portable.zip) | [`B5DBC2DE...4E742D8`](https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0) |
+| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v3.0.0/EyeGuard_Setup.exe) | [`0FFB5041...4F713E6E`](https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0) |
 | 🪟 **Winget Package** | Official Windows Package Manager distribution. Automatically tracked and updated. | `winget install hocinechero.EyeGuard` | Microsoft Pipeline |
+
+**v3.0.0 Release SHA-256 Checksums** ([GitHub Release](https://github.com/hocinechero/EyeGuard/releases/tag/v3.0.0)):
+- `EyeGuard_Portable.zip` (`29,135,452` bytes): `B5DBC2DEE20830D15A8E3A477D774990CE8CA0906518C448BE0D44F8D4E742D8`
+- `EyeGuard_Setup.exe` (`21,228,009` bytes): `0FFB5041FF561445925CA06B4C196C43353182E7BED3282CE9CB799F4F713E6E`
+- `EyeGuard-Source.zip` (`13,144,329` bytes): `DD5159C195A4298089D376A9260D1E4D01203B3182EF9E5D44567B328B395FA0`
 
 </div>
 
@@ -127,9 +132,11 @@ Follows the American Academy of Ophthalmology 20-20-20 rule: every 20 minutes, g
   - *Fullscreen Micro-Rest:* Guided breathing ring with calming eye relaxation exercises.
   - *Strict Break:* Fullscreen lock ensuring true ocular rest.
 
-### 2. 🌡️ Continuous Color Temperature (1000K – 6500K)
-Continuous, mathematically pure gamma curve scaling from crisp 6500K daylight down to 1000K candlelit ruby warmth.
-- **8 Instant Clinical Presets:** *Health (5000K), Office (5500K), Reading (4000K), Editing (6500K), Cinema (5800K), Gaming (6500K), Bedtime (2700K), and Biohacker Ruby (1000K)*.
+### 2. 🌡️ Continuous Color Temperature (0K – 6500K)
+Continuous, mathematically pure gamma curve scaling from crisp 6500K daylight through 1000K glowing ember down to 0K pure zero-green/zero-blue ruby red.
+- **8 Instant Clinical Presets:** *Health (5000K), Office (5500K), Reading (4000K), Editing (6500K), Cinema (5800K), Gaming (6500K), Bedtime (2700K), and Biohacker Ruby (0K)*.
+- **Deep Crimson Filter (Ruby+):** Optional non-linear hardware LUT red gamma curve (`G=0, B=0`) for extreme nocturnal eye protection.
+- **Hybrid Hardware Cursor Tinting:** Tints the Windows mouse cursor alongside the screen across all display modes (Normal, Deep Crimson, Themes, Invert, Grayscale, and Terminal Green) — enabled by default.
 
 ### 3. 🌙 Ultra-Deep Night Dimming (Beyond Monitor 0%)
 Hardware monitor buttons stop dimming at 0%, which is still painfully bright in a dark room. EyeGuard utilizes software luminance reduction to dim your screen down to 5% with **zero PWM flicker** and zero backlight bleed.
