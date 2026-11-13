@@ -130,9 +130,34 @@ def get_running_window_processes() -> List[str]:
     return sorted(found)
 
 
-def is_foreground_fullscreen() -> bool:
-    """Checks if the foreground application window is running in true fullscreen mode."""
-    hwnd = user32.GetForegroundWindow()
+def is_any_process_running(target_names: set) -> bool:
+    """Fast O(n) Toolhelp snapshot check for process names (zero OpenProcess calls)."""
+    if not target_names:
+        return False
+    try:
+        hSnapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+        if not hSnapshot or hSnapshot == -1:
+            return False
+        try:
+            pe = PROCESSENTRY32()
+            pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+            if kernel32.Process32First(hSnapshot, ctypes.byref(pe)):
+                while True:
+                    exe = pe.szExeFile.decode("utf-8", errors="ignore").lower().strip()
+                    if exe in target_names:
+                        return True
+                    if not kernel32.Process32Next(hSnapshot, ctypes.byref(pe)):
+                        break
+        finally:
+            kernel32.CloseHandle(hSnapshot)
+    except Exception:
+        pass
+    return False
+
+
+def is_foreground_fullscreen(hwnd: Optional[int] = None) -> bool:
+    """Checks if the target (or foreground) application window is running in true fullscreen mode."""
+    hwnd = hwnd or user32.GetForegroundWindow()
     if not hwnd:
         return False
     class_buf = ctypes.create_unicode_buffer(64)
@@ -195,7 +220,11 @@ class MagicWindowEngine:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self._wake_event = threading.Event()
         self._own_pid = os.getpid()
+
+    def wake(self):
+        self._wake_event.set()
 
     def start(self):
         with self._lock:
@@ -203,6 +232,7 @@ class MagicWindowEngine:
                 return
             self._running = True
             self._stop_event.clear()
+            self._wake_event.clear()
             self._thread = threading.Thread(
                 target=self._worker_loop,
                 name="EyeGuard-MagicWindowThread",
@@ -214,6 +244,7 @@ class MagicWindowEngine:
         with self._lock:
             self._running = False
             self._stop_event.set()
+            self._wake_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1.0)
         self.restore_all_windows()
@@ -256,6 +287,7 @@ class MagicWindowEngine:
                 self.app_rules = {
                     str(k).lower().strip(): str(v) for k, v in app_rules.items() if k
                 }
+            self._wake_event.set()
             return self.get_state()
 
     def set_app_rule(self, exe_name: str, mode: str) -> Dict[str, Any]:
@@ -404,6 +436,31 @@ class MagicWindowEngine:
 
     def _worker_loop(self):
         while self._running and not self._stop_event.is_set():
+            needs_watch = bool(
+                self.disable_fullscreen
+                or self.auto_dark_enabled
+                or (self.reading_theme_scope == "app" and self.reading_theme_target_app)
+            )
+            if not needs_watch:
+                if self._active_rule_mode is not None:
+                    self._active_rule_mode = None
+                    if self._on_rule_trigger:
+                        try:
+                            self._on_rule_trigger(None)
+                        except Exception:
+                            pass
+                self._wake_event.clear()
+                if self._stop_event.is_set() or not self._running:
+                    break
+                needs_watch_recheck = bool(
+                    self.disable_fullscreen
+                    or self.auto_dark_enabled
+                    or (self.reading_theme_scope == "app" and self.reading_theme_target_app)
+                )
+                if not needs_watch_recheck:
+                    self._wake_event.wait()
+                continue
+
             try:
                 hwnd, exe_name = get_foreground_process_name()
                 pid = wintypes.DWORD(0)
@@ -413,7 +470,7 @@ class MagicWindowEngine:
                 if pid.value != self._own_pid:
                     desired_mode: Optional[str] = None
                     # 1. Check Fullscreen Bypass first if enabled
-                    if self.disable_fullscreen and is_foreground_fullscreen():
+                    if self.disable_fullscreen and is_foreground_fullscreen(hwnd):
                         desired_mode = "exclude"
                     # 2. Check Custom App Rules if enabled
                     elif self.auto_dark_enabled and exe_name:
@@ -437,4 +494,6 @@ class MagicWindowEngine:
                                     pass
             except Exception:
                 pass
-            self._stop_event.wait(timeout=0.35)
+            self._wake_event.clear()
+            if not self._stop_event.is_set() and self._running:
+                self._wake_event.wait(timeout=0.35)

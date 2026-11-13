@@ -994,10 +994,10 @@
         /* Reading Themes Swatches (Full Screen Color Themes) */
         .page-normal { background: #2c3547; color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); }
         .page-sepia { background: #F0DEC7; color: #644D32; border: 1px solid #B8A38A; }
-        .page-paper { background: #FFF6A4; color: #3A3000; border: 1px solid #D8CA7E; }
+        .page-paper { background: #F0DEC7; color: #0F172A; border: 1px solid #C8B59B; }
         .page-e-ink { background: #D3DEEE; color: #1A202C; border: 1px solid #A4B3C6; }
         .page-dark { background: #141824; color: #FFFFFF; border: 1px solid #334155; }
-        .page-d-sepia { background: #2B1D14; color: #F59E0B; border: 1px solid #5C3826; }
+        .page-d-sepia { background: #2B2B2B; color: #A9B7C6; border: 1px solid #4A5568; }
         .page-console { background: #06120B; color: #10B981; border: 1px solid #064E3B; }
 
         .theme-active-pill {
@@ -2045,10 +2045,10 @@
                         </div>
                     </div>
                     <div class="spectrum-container" dir="ltr" style="margin: 14px 0 16px 0;">
-                        <input type="range" class="range-slider" dir="ltr" id="slider-kelvin" min="1000" max="6500" value="6500" oninput="handleKelvinChange(this.value)">
+                        <input type="range" class="range-slider" dir="ltr" id="slider-kelvin" min="0" max="6500" value="6500" oninput="handleKelvinChange(this.value)">
                     </div>
                     <div dir="ltr" style="position: relative; display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); line-height: 1.2; padding-top: 4px;">
-                        <span id="lbl-min-k" style="z-index: 1;">1000 K (Deep Ruby Red)</span>
+                        <span id="lbl-min-k" style="z-index: 1;">0 K (Zero-Blue Darkroom)</span>
                         <span id="lbl-current-desc" style="position: absolute; left: 50%; transform: translateX(-50%); color: var(--accent-teal); font-weight: 600; text-align: center; pointer-events: none; z-index: 2;">Balanced Office Comfort</span>
                         <span id="lbl-max-k" style="z-index: 1;">6500 K (Original Screen)</span>
                     </div>
@@ -2058,7 +2058,7 @@
                 <div class="hero-metric-card" style="padding: 8px 12px; margin-bottom: 7px;">
                     <div style="display: grid; grid-template-columns: 145px 1fr 44px; align-items: center; gap: 8px; margin-bottom: 6px;">
                         <span class="metric-title" id="lbl-hero-bright" style="font-size: 12px;">Software Brightness</span>
-                        <input type="range" class="range-slider" dir="ltr" id="slider-bright" min="0" max="100" value="85" oninput="handleBrightChange(this.value)">
+                        <input type="range" class="range-slider" dir="ltr" id="slider-bright" min="1" max="100" value="85" oninput="handleBrightChange(this.value)">
                         <div class="metric-value-box" style="justify-content: flex-end;">
                             <span class="metric-number" id="val-bright-hero" style="font-size: 13px;">85</span>
                             <span style="font-size: 11px; color: var(--text-secondary);">%</span>
@@ -2604,6 +2604,7 @@
                                 <option value="1900" selected>1900K (Candlelight)</option>
                                 <option value="1200">1200K (Ember)</option>
                                 <option value="1000">1000K (Ruby Darkroom)</option>
+                                <option value="0">0K (Pure Zero-Blue Red)</option>
                             </select>
                             <select class="care-select" id="sel-bedtime-b" onchange="saveCircadianSchedule()">
                                 <option value="70">70%</option>
@@ -3156,15 +3157,23 @@
 
                         <div class="form-row">
                             <div>
-                                <div class="form-label" id="s-ext-title" style="color:#fbbf24;">Unlock Deep Ruby Red Darkroom (1000K)</div>
-                                <div style="font-size:10px; color:var(--text-tertiary);" id="s-ext-desc">Unlocks 1000K Deep Ruby Red night vision with zero blue & zero green light</div>
+                                <div class="form-label" id="s-ext-title" style="color:#fbbf24;">Unlock Deep Ruby Red Darkroom (0K)</div>
+                                <div style="font-size:10px; color:var(--text-tertiary);" id="s-ext-desc">Unlocks 0K..6500K Deep Ruby Red night vision with zero blue & zero green light</div>
                             </div>
                             <input type="checkbox" id="chk-ext-range" checked onchange="handleExtendedRangeToggle(this.checked)">
                         </div>
 
                         <div class="form-row">
-                            <span class="form-label">Use wider brightness range (0 - 100)</span>
+                            <span class="form-label">Use wider brightness range (1% - 100%)</span>
                             <input type="checkbox" id="opt-disp-widebright" checked onchange="saveDisplayOptionsSubtab()">
+                        </div>
+
+                        <div class="form-row">
+                            <div>
+                                <div class="form-label">Link physical monitor backlight to software brightness</div>
+                                <div style="font-size:10px; color:var(--text-tertiary);">Co-adjusts hardware DDC/CI & laptop WMI backlight automatically with the dimmer slider</div>
+                            </div>
+                            <input type="checkbox" id="opt-disp-linkhw" onchange="saveDisplayOptionsSubtab()">
                         </div>
 
                         <div class="form-row">
@@ -3382,8 +3391,8 @@
                 cDarkDesc: "تبديل ثيم ويندوز وتطبيقات النظام بين النهاري الفاتح والليلي الداكن حسب دورة الشمس",
 
                 settingsHeader: "Advanced System Options",
-                extRangeTitle: "Unlock Deep Ruby Red Range (1000K - 6500K)",
-                extRangeDesc: "Access extreme ruby darkroom night vision (1000K) with zero blue & zero green light",
+                extRangeTitle: "Unlock Deep Ruby Red Range (0K - 6500K)",
+                extRangeDesc: "Access extreme ruby darkroom night vision (0K) with zero blue & zero green light",
                 trayTitle: "Minimize to System Tray on Close",
                 trayDesc: "Silently runs in the background taskbar tray",
                 hotkeysHeader: "Global Keyboard Shortcuts",
@@ -3410,7 +3419,7 @@
                 breathHold: "Hold...",
                 breathExhale: "Exhale...",
 
-                kMinExt: "1000 K (Deep Ruby Red)",
+                kMinExt: "0 K (Zero-Blue Darkroom)",
                 kMaxExt: "6500 K (Original Screen)",
                 kMinStd: "1900 K (Candlelight)",
                 kMaxStd: "6500 K (Original Screen)",
@@ -3487,8 +3496,8 @@
                 cDarkDesc: "Automatically switches Windows system & apps between Light (Day) and Dark (Sunset/Night)",
 
                 settingsHeader: "Advanced System Options",
-                extRangeTitle: "Unlock Deep Ruby Red Range (1000K - 6500K)",
-                extRangeDesc: "Access extreme ruby darkroom night vision (1000K) with zero blue & zero green light",
+                extRangeTitle: "Unlock Deep Ruby Red Range (0K - 6500K)",
+                extRangeDesc: "Access extreme ruby darkroom night vision (0K) with zero blue & zero green light",
                 trayTitle: "Minimize to System Tray on Close",
                 trayDesc: "Silently runs in the background taskbar tray",
                 hotkeysHeader: "Global Keyboard Shortcuts",
@@ -3515,7 +3524,7 @@
                 breathHold: "Hold...",
                 breathExhale: "Exhale...",
 
-                kMinExt: "1000 K (Deep Ruby Red)",
+                kMinExt: "0 K (Zero-Blue Darkroom)",
                 kMaxExt: "6500 K (Original Screen)",
                 kMinStd: "1900 K (Candlelight)",
                 kMaxStd: "6500 K (Original Screen)",
@@ -3674,7 +3683,7 @@
 
             if (window.pywebview && window.pywebview.api && window.pywebview.api.update_circadian_schedule) {
                 const data = await window.pywebview.api.update_circadian_schedule(
-                    sunrise, sunset, bedtime, dayK, nightK, bedK, dayB, nightB, bedB
+                    sunrise, sunset, dayK, nightK, bedtime, bedK, dayB, nightB, bedB
                 );
                 if (data) renderSolarCurveData(data);
             }
@@ -4077,10 +4086,10 @@
             const lblMax = document.getElementById('lbl-max-k');
             if (enabled) {
                 if (sk) {
-                    sk.min = '1000';
+                    sk.min = '0';
                     sk.max = '6500';
                 }
-                if (lblMin) lblMin.innerText = '1000 K (Deep Ruby Red)';
+                if (lblMin) lblMin.innerText = '0 K (Zero-Blue Darkroom)';
                 if (lblMax) lblMax.innerText = '6500 K (Original Screen)';
             } else {
                 if (sk) {
@@ -4118,9 +4127,11 @@
             lastUserSliderInteraction = Date.now();
             const parsed = parseInt(val);
             const sk = document.getElementById('slider-kelvin');
-            const minK = sk ? (parseInt(sk.min) || 1000) : 1000;
-            const maxK = sk ? (parseInt(sk.max) || 6500) : 6500;
-            currentK = isNaN(parsed) ? 5000 : Math.max(Math.max(1000, minK), Math.min(maxK, parsed));
+            const parsedMin = sk ? parseInt(sk.min, 10) : NaN;
+            const minK = Number.isNaN(parsedMin) ? 0 : parsedMin;
+            const parsedMax = sk ? parseInt(sk.max, 10) : NaN;
+            const maxK = Number.isNaN(parsedMax) ? 6500 : parsedMax;
+            currentK = isNaN(parsed) ? 5000 : Math.max(minK, Math.min(maxK, parsed));
             updateKelvinText(currentK);
             updatePresetBadge();
             if (!skipPresetSave) scheduleSaveActivePreset();
@@ -4128,7 +4139,7 @@
             if (kelvinTimer) clearTimeout(kelvinTimer);
             kelvinTimer = setTimeout(() => {
                 flushKelvinToBackend(currentK);
-            }, 60);
+            }, 16);
         }
 
         let brightTimer = null;
@@ -4156,14 +4167,16 @@
         function handleBrightChange(val, skipPresetSave) {
             lastUserSliderInteraction = Date.now();
             const parsed = parseInt(val);
-            currentB = isNaN(parsed) ? 85 : Math.max(0, Math.min(100, parsed));
+            const sb = document.getElementById('slider-bright');
+            const minB = sb ? (parseInt(sb.min) || 1) : 1;
+            currentB = isNaN(parsed) ? 85 : Math.max(minB, Math.min(100, parsed));
             document.getElementById('val-bright-hero').innerText = currentB;
             if (!skipPresetSave) scheduleSaveActivePreset();
 
             if (brightTimer) clearTimeout(brightTimer);
             brightTimer = setTimeout(() => {
                 flushBrightToBackend(currentB);
-            }, 60);
+            }, 16);
         }
 
         let satTimer = null;
@@ -4180,7 +4193,7 @@
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.set_saturation) {
                     window.pywebview.api.set_saturation(parsed);
                 }
-            }, 60);
+            }, 16);
         }
 
         let hwBrightTimer = null;
@@ -4197,7 +4210,7 @@
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.set_hardware_brightness) {
                     window.pywebview.api.set_hardware_brightness(parsed);
                 }
-            }, 60);
+            }, 16);
         }
 
         async function toggleTempFilterDisable() {
@@ -4275,7 +4288,7 @@
             if (sb) sb.value = 100;
             const sbSat = document.getElementById('slider-saturation');
             if (sbSat) sbSat.value = 100;
-            const vbSat = document.getElementById('val-saturation-hero');
+            const vbSat = document.getElementById('val-sat-hero');
             if (vbSat) vbSat.innerText = '100';
             const vbHero = document.getElementById('val-bright-hero');
             if (vbHero) vbHero.innerText = '100';
@@ -5665,8 +5678,16 @@
             const wideBright = document.getElementById('opt-disp-widebright').checked;
             const sBright = document.getElementById('slider-bright');
             if (sBright) {
-                sBright.min = wideBright ? "5" : "20";
+                const minB = wideBright ? 1 : 25;
+                sBright.min = String(minB);
+                if (currentB < minB) {
+                    currentB = minB;
+                    sBright.value = minB;
+                    const vb = document.getElementById('val-bright-hero');
+                    if (vb) vb.innerText = minB;
+                }
             }
+            const linkHwEl = document.getElementById('opt-disp-linkhw');
             const payload = {
                 smooth_transition: document.getElementById('opt-disp-smooth').checked,
                 software_filter_mode: document.getElementById('opt-disp-swfilter').checked,
@@ -5674,6 +5695,7 @@
                 software_mouse_cursor: document.getElementById('opt-disp-cursor').checked,
                 unlock_extended_range: document.getElementById('chk-ext-range').checked,
                 wider_brightness_range: wideBright,
+                link_hardware_brightness: linkHwEl ? linkHwEl.checked : false,
                 keep_background_green: document.getElementById('opt-disp-green').checked
             };
             if (window.pywebview && window.pywebview.api && window.pywebview.api.update_display_options) {
@@ -5812,11 +5834,13 @@
                             const wideB = cfg.screen.wider_brightness_range !== false;
                             document.getElementById('opt-disp-widebright').checked = wideB;
                             const sBright = document.getElementById('slider-bright');
-                            if (sBright) sBright.min = wideB ? "5" : "20";
+                            if (sBright) sBright.min = wideB ? "1" : "25";
+                            const elLinkHw = document.getElementById('opt-disp-linkhw');
+                            if (elLinkHw) elLinkHw.checked = !!cfg.screen.link_hardware_brightness;
                             document.getElementById('opt-disp-green').checked = !!cfg.screen.keep_background_green;
                             if (typeof cfg.screen.saturation === 'number') {
                                 const sSat = document.getElementById('slider-saturation');
-                                const vSat = document.getElementById('val-saturation-hero');
+                                const vSat = document.getElementById('val-sat-hero');
                                 if (sSat) sSat.value = cfg.screen.saturation;
                                 if (vSat) vSat.innerText = cfg.screen.saturation;
                             }
@@ -5911,10 +5935,15 @@
         // =================================================================
         let hasInitializedFromBackend = false;
         let lastHandledBreakId = null;
+        let pollTimer = null;
 
         async function clientPollLoop() {
+            if (document.hidden) {
+                pollTimer = null;
+                return;
+            }
             if (Date.now() - lastUserSliderInteraction < 800) {
-                setTimeout(clientPollLoop, 1000);
+                pollTimer = setTimeout(clientPollLoop, 1000);
                 return;
             }
             try {
@@ -5940,7 +5969,7 @@
                             const initSat = (typeof st.current_sat === 'number') ? st.current_sat : ((typeof st.saturation === 'number') ? st.saturation : null);
                             if (initSat !== null) {
                                 const sSat = document.getElementById('slider-saturation');
-                                const vSat = document.getElementById('val-saturation-hero');
+                                const vSat = document.getElementById('val-sat-hero');
                                 if (sSat) sSat.value = initSat;
                                 if (vSat) vSat.innerText = initSat;
                             }
@@ -6184,7 +6213,11 @@
                     }
                 }
             } catch (e) {}
-            setTimeout(clientPollLoop, 1000);
+            if (!document.hidden) {
+                pollTimer = setTimeout(clientPollLoop, 1000);
+            } else {
+                pollTimer = null;
+            }
         }
 
         // =================================================================
@@ -6391,7 +6424,13 @@
             loadFocusConfig();
             loadTimerConfig();
             fetchActiveApps();
-            setTimeout(clientPollLoop, 200);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    if (pollTimer) clearTimeout(pollTimer);
+                    clientPollLoop();
+                }
+            });
+            pollTimer = setTimeout(clientPollLoop, 200);
         }
 
         if (window.pywebview && window.pywebview.api) {

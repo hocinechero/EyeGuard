@@ -430,6 +430,7 @@ class DesktopOverlayManager:
         self.toast_h = 60
         self._toast_hdc_mem = None
         self._toast_hbm = None
+        self._toast_old_hbm = None
         self._toast_p_bits = None
         self._toast_last_w = 0
         self._toast_last_h = 0
@@ -457,12 +458,14 @@ class DesktopOverlayManager:
 
         self._cmd_queue: "queue.Queue[tuple]" = queue.Queue()
         self._stop_event = threading.Event()
+        self._wake_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
         self._stop_event.clear()
+        self._wake_event.clear()
         self._thread = threading.Thread(
             target=self._thread_loop,
             name="VG-DesktopOverlays-Thread",
@@ -472,14 +475,15 @@ class DesktopOverlayManager:
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._wake_event.set()
+        if self._thread is not None and self._thread.is_alive():
+            self._thread.join(timeout=1.5)
         if hasattr(self, "_gdiplus_token") and self._gdiplus_token.value:
             try:
                 gdiplus.GdiplusShutdown(self._gdiplus_token)
                 self._gdiplus_token = ctypes.c_ulong(0)
             except Exception:
                 pass
-        if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=1.5)
 
     def configure_mini_window(
         self,
@@ -493,6 +497,7 @@ class DesktopOverlayManager:
         self.mini_auto_translucent = bool(auto_translucent)
         self.mini_opacity_pct = max(30, min(100, int(opacity_pct)))
         self._cmd_queue.put(("sync_mini",))
+        self._wake_event.set()
 
     def update_mini_timer(
         self, remaining_sec: int, total_sec: int, phase_label: str = "WORK"
@@ -506,6 +511,7 @@ class DesktopOverlayManager:
         self.mini_progress = max(0.0, min(1.0, float(rem) / float(tot)))
         if self.mini_enabled:
             self._cmd_queue.put(("repaint_mini",))
+            self._wake_event.set()
 
     def show_toast(
         self,
@@ -529,11 +535,13 @@ class DesktopOverlayManager:
         self.toast_hover_btn = None
         self.toast_visible = True
         self._cmd_queue.put(("show_toast",))
+        self._wake_event.set()
 
     def hide_toast(self) -> None:
         self.toast_visible = False
         self.toast_hover_btn = None
         self._cmd_queue.put(("hide_toast",))
+        self._wake_event.set()
 
     def configure_magic_toolbar(
         self,
@@ -550,6 +558,7 @@ class DesktopOverlayManager:
         self.toolbar_delay_sec = max(0.05, min(2.0, float(delay_sec)))
         if not self.toolbar_enabled:
             self._cmd_queue.put(("hide_toolbar",))
+        self._wake_event.set()
 
     # ------------------------------------------------------------------
     # Win32 Window Procedure
@@ -779,6 +788,9 @@ class DesktopOverlayManager:
             or getattr(self, "_toast_last_h", 0) != h
         ):
             if self._toast_hbm:
+                if self._toast_hdc_mem and getattr(self, "_toast_old_hbm", None):
+                    gdi32.SelectObject(self._toast_hdc_mem, self._toast_old_hbm)
+                    self._toast_old_hbm = None
                 gdi32.DeleteObject(self._toast_hbm)
                 self._toast_hbm = None
             if self._toast_hdc_mem:
@@ -804,7 +816,7 @@ class DesktopOverlayManager:
                 None,
                 0,
             )
-            gdi32.SelectObject(self._toast_hdc_mem, self._toast_hbm)
+            self._toast_old_hbm = gdi32.SelectObject(self._toast_hdc_mem, self._toast_hbm)
             user32.ReleaseDC(None, hdc_screen)
             self._toast_last_w = w
             self._toast_last_h = h
@@ -1190,26 +1202,6 @@ class DesktopOverlayManager:
         gdiplus.GdipDeleteFont(f_btn)
         gdiplus.GdipDeleteFontFamily(ff)
 
-        blend = BLENDFUNCTION(0, 0, 255, 1)
-        pt_src = wintypes.POINT(0, 0)
-        pt_dest = wintypes.POINT(self.toast_x, self.toast_y)
-        size_dest = wintypes.SIZE(w, h)
-        hdc_screen = user32.GetDC(None)
-
-        user32.UpdateLayeredWindow(
-            self.hwnd_toast,
-            hdc_screen,
-            ctypes.byref(pt_dest),
-            ctypes.byref(size_dest),
-            self._toast_hdc_mem,
-            ctypes.byref(pt_src),
-            0,
-            ctypes.byref(blend),
-            2,  # ULW_ALPHA
-        )
-        user32.ReleaseDC(None, hdc_screen)
-        user32.ShowWindow(self.hwnd_toast, 4)  # SW_SHOWNOACTIVATE
-
     def _paint_toolbar_window(self, hwnd: int) -> None:
         ps = PAINTSTRUCT()
         hdc = user32.BeginPaint(hwnd, ctypes.byref(ps))
@@ -1365,10 +1357,21 @@ class DesktopOverlayManager:
             if self.toolbar_enabled and self.hwnd_toolbar:
                 self._step_magic_toolbar(now)
 
-            time.sleep(0.04)
+            self._wake_event.clear()
+            if not self._cmd_queue.empty() or self._stop_event.is_set():
+                continue
+            if self.toast_visible or self.toolbar_enabled:
+                self._wake_event.wait(timeout=0.04)
+            elif self.mini_enabled:
+                self._wake_event.wait(timeout=0.12)
+            else:
+                self._wake_event.wait()
 
         # Cleanup toast DIB and memory DC
         if self._toast_hbm:
+            if self._toast_hdc_mem and getattr(self, "_toast_old_hbm", None):
+                gdi32.SelectObject(self._toast_hdc_mem, self._toast_old_hbm)
+                self._toast_old_hbm = None
             gdi32.DeleteObject(self._toast_hbm)
             self._toast_hbm = None
         if self._toast_hdc_mem:

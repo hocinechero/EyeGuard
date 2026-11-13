@@ -199,6 +199,9 @@ class EyeGuardApp:
         self.gamma_engine = EyeGuardGammaEngine()
         from core.system_events import SystemEventsMonitor
         self.system_events = SystemEventsMonitor(on_resume=self._on_system_resume, on_display_change=self._on_display_change, on_meeting_status_change=self._on_meeting_status_change)
+        self.system_events.set_meeting_detection(
+            bool(self.config_mgr.get("general", "auto_meeting_bypass", default=True))
+        )
         cir_cfg = self.config_mgr.get("circadian", default={}) or {}
         self.solar_engine = SolarEngine(
             sunrise=cir_cfg.get("sunrise", "06:30"),
@@ -273,27 +276,31 @@ class EyeGuardApp:
         self.magic_engine.start()
         scr_mode = str(scr_cfg.get("mode", "Health"))
         raw_k = scr_cfg.get("kelvin")
-        if raw_k is None or int(raw_k) <= 0 or scr_mode.lower() in ("natural", "standard"):
+        if raw_k is None or scr_mode.lower() in ("natural", "standard"):
             self.current_k = 6500
         else:
             try:
-                self.current_k = max(1000, min(6500, int(raw_k)))
+                min_k = self._get_min_kelvin()
+                k_parsed = int(raw_k)
+                self.current_k = max(min_k, min(6500, k_parsed)) if k_parsed >= 0 else 6500
             except Exception:
                 self.current_k = 6500
 
         raw_b = scr_cfg.get("brightness")
-        if raw_b is None or int(raw_b) <= 0:
+        if raw_b is None or int(raw_b) < 1:
             self.current_b = 100
         else:
-            self.current_b = int(raw_b)
+            min_b = 1 if bool(scr_cfg.get("wider_brightness_range", True)) else 25
+            self.current_b = max(min_b, min(100, int(raw_b)))
 
         self.current_sat = int(scr_cfg.get("saturation", 100))
-        self.current_hw_b = int(scr_cfg.get("hardware_brightness", 100))
+        live_hw = self.gamma_engine.get_hardware_brightness()
+        self.current_hw_b = live_hw if live_hw is not None else int(scr_cfg.get("hardware_brightness", 100))
         self.is_gray = bool(scr_cfg.get("grayscale", False))
         self.is_invert = bool(scr_cfg.get("invert", False))
-        self.color_filter_mode = str(scr_cfg.get("color_filter_mode", "day"))
-        if self.color_filter_mode in ("normal", "standard"):
-            self.color_filter_mode = "day" 
+        self.color_filter_mode = str(scr_cfg.get("color_filter_mode", "normal"))
+        if self.color_filter_mode in ("day", "standard"):
+            self.color_filter_mode = "normal" 
 
         self.gamma_engine.saturation = max(0.0, min(1.0, self.current_sat / 100.0))
         self.gamma_engine.green_background = bool(scr_cfg.get("keep_background_green", False))
@@ -831,15 +838,19 @@ class EyeGuardApp:
         self.current_sat = 100
         self.is_gray = False
         self.is_invert = False
-        self.color_filter_mode = "day"
+        self.color_filter_mode = "normal"
+        self.active_reading_theme = "normal"
+        self._filter_disabled_until_ts = None
+        self.gamma_engine.saturation = 1.0
         self.config_mgr.set("screen", "kelvin", 6500)
         self.config_mgr.set("screen", "brightness", 100)
         self.config_mgr.set("screen", "saturation", 100)
         self.config_mgr.set("screen", "grayscale", False)
         self.config_mgr.set("screen", "invert", False)
-        self.config_mgr.set("screen", "color_filter_mode", "day")
+        self.config_mgr.set("screen", "color_filter_mode", "normal")
+        self.config_mgr.set("screen", "reading_theme", "normal")
         self.config_mgr.set("screen", "mode", "Natural")
-        self.gamma_engine.set_display(6500, 100, False, False, smooth=False, color_mode="day")
+        self.gamma_engine.set_display(6500, 100, False, False, smooth=False, color_mode="normal")
 
         # Universal Emergency Unlock: disable focus ruler, spotlight mask, and clear stuck overlays
         if hasattr(self, "focus_ruler"):
@@ -854,42 +865,59 @@ class EyeGuardApp:
                 pass
         if hasattr(self, "desktop_overlays"):
             try:
-                self.desktop_overlays.hide_overlay()
+                self.desktop_overlays.hide_toast()
             except Exception:
                 pass
 
         self._schedule_tray_update()
-        return {"kelvin": 6500, "brightness": 100, "mode": "day"}
+        return {"kelvin": 6500, "brightness": 100, "mode": "normal"}
+
+    def _get_min_kelvin(self) -> int:
+        return 0 if bool(self.config_mgr.get("screen", "unlock_extended_range", default=True)) else 1900
+
+    def _get_min_brightness(self) -> int:
+        return 1 if bool(self.config_mgr.get("screen", "wider_brightness_range", default=True)) else 25
 
     def disable_filter_temporarily(self, minutes: int = 60):
         """Temporarily disables the display filter for N minutes (e.g. 60m for color work) or 0 to resume."""
         if int(minutes) <= 0:
             self._filter_disabled_until_ts = None
+            self.gamma_engine.green_background = bool(
+                self.config_mgr.get("screen", "keep_background_green", default=False)
+            )
             self.gamma_engine.set_display(
                 self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
             )
             return {"disabled": False, "until_ts": None}
         self._filter_disabled_until_ts = time.time() + int(minutes) * 60
-        self.gamma_engine.set_display(6500, 100, False, False, smooth=True)
+        self.gamma_engine.green_background = False
+        self.gamma_engine.set_display(6500, 100, False, False, smooth=True, color_mode="normal")
         return {"disabled": True, "until_ts": self._filter_disabled_until_ts}
 
     def apply_preset_name(self, name: str):
         self._filter_disabled_until_ts = None
+        self.gamma_engine.green_background = bool(
+            self.config_mgr.get("screen", "keep_background_green", default=False)
+        )
         if self.circadian_active:
             self.circadian_active = False
             self.config_mgr.set("circadian", "enabled", False)
         self.config_mgr.set("screen", "mode", str(name))
         saved_presets = self.config_mgr.get("presets", default={}) or {}
+        min_k = self._get_min_kelvin()
+        min_b = self._get_min_brightness()
         if name in saved_presets and isinstance(saved_presets[name], dict):
             k = int(saved_presets[name].get("kelvin", 5000))
             b = int(saved_presets[name].get("brightness", 85))
-            self.current_k = max(1000, min(6500, k))
-            self.current_b = max(5, min(100, b))
+            self.current_k = max(min_k, min(6500, k))
+            self.current_b = max(min_b, min(100, b))
             self.gamma_engine.set_display(
                 self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
             )
             self.config_mgr.set("screen", "kelvin", self.current_k)
             self.config_mgr.set("screen", "brightness", self.current_b)
+            if bool(self.config_mgr.get("screen", "link_hardware_brightness", default=False)):
+                self.set_hardware_brightness(self.current_b)
             self._schedule_tray_update()
             return {"name": name, "kelvin": self.current_k, "brightness": self.current_b}
 
@@ -906,13 +934,15 @@ class EyeGuardApp:
         }
         if name in presets:
             k, b = presets[name]
-            self.current_k = k
-            self.current_b = b
+            self.current_k = max(min_k, min(6500, k))
+            self.current_b = max(min_b, min(100, b))
             self.gamma_engine.set_display(
                 self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
             )
             self.config_mgr.set("screen", "kelvin", self.current_k)
             self.config_mgr.set("screen", "brightness", self.current_b)
+            if bool(self.config_mgr.get("screen", "link_hardware_brightness", default=False)):
+                self.set_hardware_brightness(self.current_b)
             self._schedule_tray_update()
         return {"name": name, "kelvin": self.current_k, "brightness": self.current_b}
 
@@ -952,7 +982,7 @@ class EyeGuardApp:
         if self.circadian_active:
             self.circadian_active = False
             self.config_mgr.set("circadian", "enabled", False)
-        self.current_k = max(1000, min(6500, int(k)))
+        self.current_k = max(self._get_min_kelvin(), min(6500, int(k)))
         self.gamma_engine.set_display(
             self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=False, color_mode=self.color_filter_mode
         )
@@ -964,11 +994,13 @@ class EyeGuardApp:
         if self.circadian_active:
             self.circadian_active = False
             self.config_mgr.set("circadian", "enabled", False)
-        self.current_b = max(5, min(100, int(b)))
+        self.current_b = max(self._get_min_brightness(), min(100, int(b)))
         self.gamma_engine.set_display(
             self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=False, color_mode=self.color_filter_mode
         )
         self.config_mgr.set("screen", "brightness", self.current_b)
+        if bool(self.config_mgr.get("screen", "link_hardware_brightness", default=False)):
+            self.set_hardware_brightness(self.current_b)
 
     def set_saturation(self, sat_pct: int):
         self.current_sat = max(0, min(100, int(sat_pct)))
@@ -1452,6 +1484,9 @@ class EyeGuardApp:
                 and time.time() >= self._filter_disabled_until_ts
             ):
                 self._filter_disabled_until_ts = None
+                self.gamma_engine.green_background = bool(
+                    self.config_mgr.get("screen", "keep_background_green", default=False)
+                )
                 self.gamma_engine.set_display(
                     self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
                 )
@@ -1461,7 +1496,7 @@ class EyeGuardApp:
                     solar_k = self.solar_engine.get_kelvin_for_time()
                     st = self.solar_engine.get_solar_state_for_time()
                     self.current_k = int(solar_k)
-                    self.current_b = int(st["brightness"])
+                    self.current_b = max(self._get_min_brightness(), int(st["brightness"]))
                     self.gamma_engine.set_display(
                         self.current_k,
                         self.current_b,
@@ -1470,10 +1505,14 @@ class EyeGuardApp:
                         smooth=True,
                         color_mode=self.color_filter_mode,
                     )
+                    if bool(self.config_mgr.get("screen", "link_hardware_brightness", default=False)):
+                        self.set_hardware_brightness(self.current_b)
                     if self.config_mgr.get("circadian", "auto_windows_dark_mode", default=False):
                         try:
                             from core.windows_theme import set_windows_dark_mode
-                            is_dark_period = (st.get("stage") in ("sunset", "bedtime", "night"))
+                            is_dark_period = (
+                                st.get("phase") in ("sunset", "evening", "bedtime_transition", "bedtime", "night")
+                            )
                             set_windows_dark_mode(is_dark_period)
                         except Exception:
                             pass
@@ -1588,6 +1627,7 @@ class EyeGuardApp:
             self.reading_theme_target_app = t
             self.config_mgr.set("screen", "reading_theme_target_app", self.reading_theme_target_app)
             self.magic_engine.reading_theme_target_app = self.reading_theme_target_app
+        self.magic_engine.wake()
 
         if self.reading_theme_scope == "fullscreen":
             self.gamma_engine.set_reading_theme(
@@ -1687,19 +1727,18 @@ class EyeGuardApp:
             "focus_active": self.focus_ruler.is_active,
             "spotlight_active": self.focus_ruler.is_spotlight_active,
             "active_rule_mode": self.magic_engine._active_rule_mode,
-            "reading_theme_scope": self.reading_theme_scope,
-            "reading_theme_target_app": self.reading_theme_target_app,
             "reading_app_focused": getattr(self.magic_engine, "_reading_app_was_focused", False),
+            "display_backend": self.gamma_engine.get_active_backend(),
         }
 
     def _setup_hotkeys(self):
         saved_hotkeys = self.config_mgr.get("hotkeys", default={})
         actions_map = {
             "brightness_up": lambda: self.set_brightness(min(100, self.current_b + 5)),
-            "brightness_down": lambda: self.set_brightness(max(5, self.current_b - 5)),
-            "kelvin_warmer": lambda: self.set_kelvin(max(1000, self.current_k - 250)),
+            "brightness_down": lambda: self.set_brightness(max(self._get_min_brightness(), self.current_b - 5)),
+            "kelvin_warmer": lambda: self.set_kelvin(max(self._get_min_kelvin(), self.current_k - 250)),
             "kelvin_cooler": lambda: self.set_kelvin(min(6500, self.current_k + 250)),
-            "reset_natural": lambda: (self.set_kelvin(6500), self.set_brightness(100)),
+            "reset_natural": lambda: self.reset_natural(),
             "toggle_ruler": self.toggle_focus_ruler,
             "toggle_spotlight": lambda: self.toggle_spotlight_focus(),
             "magic_dark": lambda: self.magic_engine.dim_foreground_window(),
@@ -1782,6 +1821,8 @@ class EyeGuardApp:
                     self.set_windows_startup(bool(v))
                 else:
                     self.config_mgr.set("general", k, v)
+                    if k == "auto_meeting_bypass" and hasattr(self, "system_events"):
+                        self.system_events.set_meeting_detection(bool(v))
         return self.get_options_config()
 
     def update_timer_options(self, **kwargs):
@@ -1814,8 +1855,13 @@ class EyeGuardApp:
         self.gamma_engine.software_filter_mode = bool(scr.get("software_filter_mode", False))
         self.gamma_engine.standard_calibration_mode = bool(scr.get("standard_calibration_mode", True))
         self.gamma_engine.software_mouse_cursor = bool(scr.get("software_mouse_cursor", False))
+        self.gamma_engine.reset_lut_capability_cache()
+        self.current_k = max(self._get_min_kelvin(), min(6500, self.current_k))
+        self.current_b = max(self._get_min_brightness(), min(100, self.current_b))
+        self.config_mgr.set("screen", "kelvin", self.current_k)
+        self.config_mgr.set("screen", "brightness", self.current_b)
         self.gamma_engine.set_display(
-            self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True
+            self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
         )
         return self.get_options_config()
 
@@ -1936,6 +1982,8 @@ class EyeGuardApp:
     def _on_display_change(self):
         """Re-calibrates monitor geometry and color effect on display resolution / monitor change."""
         try:
+            self.gamma_engine.reset_lut_capability_cache()
+            self.gamma_engine._monitors_cache = []
             self.gamma_engine.reset_all_monitors()
             self.gamma_engine.set_display(
                 self.current_k, self.current_b, self.is_gray, self.is_invert,
@@ -1956,6 +2004,9 @@ class EyeGuardApp:
                     self.tray_mgr.notify("EyeGuard Meeting Mode", "Filter temporarily paused during video conference.")
                 elif getattr(self, "_meeting_paused", False):
                     self._meeting_paused = False
+                    self.gamma_engine.green_background = bool(
+                        self.config_mgr.get("screen", "keep_background_green", default=False)
+                    )
                     self.gamma_engine.set_display(
                         self.current_k, self.current_b, self.is_gray, self.is_invert,
                         smooth=True, color_mode=self.color_filter_mode
@@ -2087,7 +2138,10 @@ class JSBridgeApi:
         self._app.toggle_invert(bool(enable))
 
     def toggle_extended_range(self, enable):
-        self._app.config_mgr.set("screen", "unlock_extended_range", bool(enable))
+        en = bool(enable)
+        self._app.config_mgr.set("screen", "unlock_extended_range", en)
+        if not en and self._app.current_k < 1900:
+            self._app.set_kelvin(1900)
 
     def toggle_extended(self, enable=None):
         en = (
@@ -2098,6 +2152,8 @@ class JSBridgeApi:
             )
         )
         self._app.config_mgr.set("screen", "unlock_extended_range", en)
+        if not en and self._app.current_k < 1900:
+            self._app.set_kelvin(1900)
 
     # --- Focus Tab API (Reading Focus + Spotlight Focus) ---
     def toggle_focus_ruler(self):
@@ -2254,7 +2310,9 @@ class JSBridgeApi:
             try:
                 from core.windows_theme import set_windows_dark_mode
                 st = self._app.solar_engine.get_solar_state_for_time()
-                is_dark_period = (st.get("stage") in ("sunset", "bedtime", "night"))
+                is_dark_period = (
+                    st.get("phase") in ("sunset", "evening", "bedtime_transition", "bedtime", "night")
+                )
                 set_windows_dark_mode(is_dark_period)
             except Exception:
                 pass
@@ -2454,9 +2512,13 @@ def run_app():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] in ("--reset", "-r"):
+    if len(sys.argv) >= 4 and sys.argv[1] == "--crash-guard":
+        from core.crash_guard import run_watchdog
+        run_watchdog(int(sys.argv[2]), sys.argv[3])
+        sys.exit(0)
+    if len(sys.argv) > 1 and sys.argv[1] in ("--reset", "-r", "--reset-hw"):
         from core.crash_guard import emergency_restore_display
-        emergency_restore_display()
+        emergency_restore_display(reset_hw_brightness=(sys.argv[1] == "--reset-hw"))
         print("EyeGuard: Screen reset to factory identity (6500K / 100%).")
         sys.exit(0)
     run_app()

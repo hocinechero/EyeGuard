@@ -16,6 +16,7 @@ DEFAULT_CONFIG = {
         "hardware_brightness": 85,
         "unlock_extended_range": True,
         "wider_brightness_range": True,
+        "link_hardware_brightness": False,
         "grayscale": False,
         "invert": False,
         "sync_monitors": True,
@@ -205,8 +206,8 @@ class ConfigManager:
             b = int(scr.get("brightness", 85))
             ext_k = bool(scr.get("unlock_extended_range", True))
             ext_b = bool(scr.get("wider_brightness_range", True))
-            min_k, max_k = (1000, 6500) if ext_k else (1900, 6500)
-            min_b = 5 if ext_b else 25
+            min_k, max_k = (0, 6500) if ext_k else (1900, 6500)
+            min_b = 1 if ext_b else 25
             scr["kelvin"] = max(min_k, min(max_k, k))
             scr["brightness"] = max(min_b, min(100, b))
             scr["saturation"] = max(0, min(100, int(scr.get("saturation", 100))))

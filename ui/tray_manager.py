@@ -27,19 +27,28 @@ def get_asset_path(filename: str) -> str:
     return ""
 
 
+_TRAY_ASSET_CACHE = {}
+
+
 def generate_eye_icon(color_rgb=(14, 165, 233), size=64):
     """
     Returns the official EyeGuard signature blue eye icon for the System Tray and Windows notifications.
-    Loads tray_icon.png from assets or falls back to procedural vector rendering of the eye icon.
+    Loads tray_icon.png from assets (cached by size) or falls back to procedural vector rendering.
     """
     import os
     tray_path = get_asset_path("tray_icon.png")
     if tray_path and os.path.exists(tray_path):
+        cache_key = (tray_path, size)
+        cached = _TRAY_ASSET_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
         try:
-            im = Image.open(tray_path).convert("RGBA")
-            if im.size != (size, size):
-                im = im.resize((size, size), Image.Resampling.LANCZOS)
-            return im
+            with Image.open(tray_path) as raw_im:
+                im = raw_im.convert("RGBA")
+                if im.size != (size, size):
+                    im = im.resize((size, size), Image.Resampling.LANCZOS)
+                _TRAY_ASSET_CACHE[cache_key] = im
+                return im
         except Exception:
             pass
 
@@ -141,6 +150,8 @@ class TrayManager:
 
         self.icon = None
         self._thread = None
+        self._using_static_asset = False
+        self._last_icon_rgb = None
 
     def start(self):
         presets_menu = pystray.Menu(
@@ -207,6 +218,8 @@ class TrayManager:
         )
 
         menu = pystray.Menu(*menu_items)
+        self._using_static_asset = bool(get_asset_path("tray_icon.png"))
+        self._last_icon_rgb = (14, 165, 233)
         initial_img = generate_eye_icon((14, 165, 233))
         self.icon = pystray.Icon(
             "EyeGuard", initial_img, "EyeGuard — by @hocine_chero", menu
@@ -216,12 +229,17 @@ class TrayManager:
         self._thread.start()
 
     def update_icon_color(self, r: int, g: int, b: int):
-        if self.icon:
-            try:
-                new_img = generate_eye_icon((r, g, b))
-                self.icon.icon = new_img
-            except Exception:
-                pass
+        if self.icon is None:
+            return
+        rgb = (int(r), int(g), int(b))
+        if self._using_static_asset or self._last_icon_rgb == rgb:
+            return
+        try:
+            new_img = generate_eye_icon(rgb)
+            self.icon.icon = new_img
+            self._last_icon_rgb = rgb
+        except Exception:
+            pass
 
     def notify(self, title: str, message: str):
         if self.icon:

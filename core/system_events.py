@@ -86,12 +86,22 @@ class SystemEventsMonitor:
         self._wnd_proc_ref: Optional[WNDPROC] = None
 
         self._in_meeting = False
+        self.meeting_detection_enabled = True
+        self._stop_event = threading.Event()
         self._meeting_poll_thread: Optional[threading.Thread] = None
+
+    def set_meeting_detection(self, enabled: bool):
+        self.meeting_detection_enabled = bool(enabled)
+        if not self.meeting_detection_enabled and self._in_meeting:
+            self._in_meeting = False
+            if self._on_meeting_status_change:
+                self._on_meeting_status_change(False)
 
     def start(self):
         if self._running:
             return
         self._running = True
+        self._stop_event.clear()
 
         self._thread = threading.Thread(
             target=self._msg_loop, name="EyeGuard-SystemEvents", daemon=True
@@ -108,6 +118,7 @@ class SystemEventsMonitor:
 
     def stop(self):
         self._running = False
+        self._stop_event.set()
         if self._hwnd:
             user32.PostMessageW(self._hwnd, 0x0010, 0, 0)  # WM_CLOSE = 0x0010
 
@@ -173,17 +184,16 @@ class SystemEventsMonitor:
                 pass
 
     def _poll_meetings(self):
-        """Polls every 5 seconds for running conference tools (optional meeting mode)."""
-        while self._running:
-            try:
-                from core.window_focus import get_running_window_processes
-                procs = get_running_window_processes()
-                has_meeting = any(p in CONFERENCE_PROCESSES for p in procs)
-
-                if has_meeting != self._in_meeting:
-                    self._in_meeting = has_meeting
-                    if self._on_meeting_status_change:
-                        self._on_meeting_status_change(self._in_meeting)
-            except Exception:
-                pass
-            time.sleep(5.0)
+        """Polls every 5 seconds via Toolhelp snapshot for conference tools (optional meeting mode)."""
+        from core.window_focus import is_any_process_running
+        while self._running and not self._stop_event.is_set():
+            if self.meeting_detection_enabled:
+                try:
+                    has_meeting = is_any_process_running(CONFERENCE_PROCESSES)
+                    if has_meeting != self._in_meeting:
+                        self._in_meeting = has_meeting
+                        if self._on_meeting_status_change:
+                            self._on_meeting_status_change(self._in_meeting)
+                except Exception:
+                    pass
+            self._stop_event.wait(5.0)

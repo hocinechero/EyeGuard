@@ -436,6 +436,9 @@ class Win32FocusRuler:
 
         self._send_command('DESTROY', None)
 
+        self._running = False
+        self._wake_event.set()
+
         if tid:
             user32.PostThreadMessageW(tid, WM_QUIT, 0, 0)
 
@@ -537,9 +540,9 @@ class Win32FocusRuler:
                 self._wake_event.wait(timeout=sleep_sec)
             else:
                 self._wake_event.clear()
-                if not self._cmd_queue.empty():
+                if not self._cmd_queue.empty() or not self._running:
                     continue
-                self._wake_event.wait(timeout=0.05)
+                self._wake_event.wait()
 
         self._disable_internal()
         self._cleanup_brush()
@@ -797,6 +800,7 @@ class Win32FocusRuler:
                 setattr(self, attr, None)
         self._is_active = False
         self._cur_spot_rect = None
+        self._last_spot_applied = None
 
     def _update_internal(self, slit_height: Optional[int], opacity: Optional[float], color_hex: Optional[str] = None):
         if slit_height is not None:
@@ -866,11 +870,13 @@ class Win32FocusRuler:
         try:
             from core.window_focus import is_foreground_fullscreen
             if is_foreground_fullscreen(fg):
+                self._last_spot_applied = None
                 for h in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
                     if h and user32.IsWindowVisible(h):
                         user32.ShowWindow(h, 0)
                 return
             elif self._hwnd_top and not user32.IsWindowVisible(self._hwnd_top):
+                self._last_spot_applied = None
                 for h in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
                     if h:
                         user32.ShowWindow(h, 4)  # SW_SHOWNOACTIVATE
@@ -929,6 +935,11 @@ class Win32FocusRuler:
         fx1, fy1, fx2, fy2 = [int(round(v)) for v in self._cur_spot_rect]
         bw = bx2 - bx1
         bh = by2 - by1
+
+        spot_tuple = (bx1, by1, bw, bh, fx1, fy1, fx2, fy2)
+        if not force and getattr(self, "_last_spot_applied", None) == spot_tuple:
+            return
+        self._last_spot_applied = spot_tuple
 
         flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW
         # Top rectangle: (bx1, by1) -> width bw, height (fy1 - by1)
