@@ -69,14 +69,24 @@ Most screen tools do only one thing: they turn your monitor orange. Dedicated do
 
 Whether you are reading research papers in Adobe Acrobat, browsing long documentation in Chrome, writing essays in Word, or reviewing code in VS Code, EyeGuard turns your display into a gentle, paper-like surface.
 
+### ✨ What's New in v3.1.0
+
+- **True `0K` Zero-Blue Darkroom Spectrum (`0K – 6500K`):** Calibrated extended curve distinguishing **pure `0K` darkroom red** (`G=0, B=0`, zero blue/green emission) from `1000K` ember glow up to `6500K` daylight (`Biohacker Ruby 0K` preset).
+- **Deep Crimson Filter (`Ruby+`) with Smart Auto-Exit:** Optional non-linear hardware red gamma shaping (`G=0, B=0`) to crush bright white-page glare at night — automatically clears cleanly the moment you move the Color Temperature slider, select another preset, or enable Circadian mode.
+- **Hybrid Hardware Cursor Tinting:** Tints the Windows mouse cursor consistently across warm temperatures, `0K`, Deep Crimson, and all 22 reading themes (enabled by default; toggleable off any time to keep a crisp white cursor).
+- **Ultra-Deep `1%` Dimming & Baseline LUT Protection:** Wide brightness range down to **`1%`** with zero PWM flicker, plus hardware baseline validation preventing accidental double-tinting when switching engines.
+
+---
+
 ### 📊 How EyeGuard Compares
 
 | Feature | Windows Night Light | f.lux | CareUEyes (Paid) | 🛡️ **EyeGuard (v3.1.0)** |
 | :--- | :---: | :---: | :---: | :---: |
+| **True `0K` Zero-Blue Darkroom & Deep Crimson** | ❌ No | ❌ No (`1200K` min) | ❌ No (`2000K` min) | ✅ **Yes (`0K` Pure Red + Cursor Tinting)** |
 | **Line-by-Line Reading Ruler** | ❌ No | ❌ No | 💲 $20/yr | ✅ **Yes (Smooth Cursor Tracking)** |
 | **Paragraph Spotlight Focus Mask** | ❌ No | ❌ No | ❌ No | ✅ **Yes (Custom Width & Dimming)** |
 | **Kindle / E-Ink / Sepia Themes** | ❌ No | ❌ No | ❌ No | ✅ **Yes (22 Authentic Palettes)** |
-| **Ultra-Deep Dimming (Below 0%)** | ❌ No | ❌ No | 💲 $20/yr | ✅ **Yes (Down to 5% Brightness)** |
+| **Ultra-Deep Dimming (Below 0%)** | ❌ No | ❌ No | 💲 $20/yr | ✅ **Yes (Down to 1% Brightness)** |
 | **Clinical 20-20-20 Break Scheduler** | ❌ No | ❌ No | 💲 $20/yr | ✅ **Yes (With Win32 Idle Sensing)** |
 | **Fail-Safe Crash Recovery Watchdog** | ❌ No | ⚠️ Can stick | ⚠️ Can stick | ✅ **Yes (Zero-Yellow Screen Crash Guarantee)** |
 | **Price & Licensing** | Built-in | Closed-source | $20/year subscription | 💖 **100% Free & Open Source (MIT)** |
@@ -132,14 +142,15 @@ Follows the American Academy of Ophthalmology 20-20-20 rule: every 20 minutes, g
   - *Fullscreen Micro-Rest:* Guided breathing ring with calming eye relaxation exercises.
   - *Strict Break:* Fullscreen lock ensuring true ocular rest.
 
-### 2. 🌡️ Continuous Color Temperature (0K – 6500K)
-Continuous, mathematically pure gamma curve scaling from crisp 6500K daylight through 1000K glowing ember down to 0K pure zero-green/zero-blue ruby red.
-- **8 Instant Clinical Presets:** *Health (5000K), Office (5500K), Reading (4000K), Editing (6500K), Cinema (5800K), Gaming (6500K), Bedtime (2700K), and Biohacker Ruby (0K)*.
-- **Deep Crimson Filter (Ruby+):** Optional non-linear hardware LUT red gamma curve (`G=0, B=0`) for extreme nocturnal eye protection.
-- **Hybrid Hardware Cursor Tinting:** Tints the Windows mouse cursor alongside the screen across all display modes (Normal, Deep Crimson, Themes, Invert, Grayscale, and Terminal Green) — enabled by default.
+### 2. 🌡️ Continuous Color Temperature (`0K – 6500K`)
+Continuous, mathematically calibrated gamma curve scaling from crisp `6500K` daylight through `1000K` glowing ember down to **`0K` Zero-Blue Darkroom** (`G=0, B=0`, eliminating 100% of blue and green light emission):
+- **True `0K` Darkroom Separation:** Unlike standard night lights that stop at amber, `0K` operates as a distinct monochromatic ruby baseline visually separated from `1000K` ember warmth.
+- **8 Instant Clinical Presets:** *Health (5000K), Office (5500K), Reading (4000K), Editing (6500K), Movie (5800K), Gaming (6500K), Night (2700K), and Biohacker Ruby (`0K · 50%`)*.
+- **Deep Crimson Filter (`Ruby+`):** Optional non-linear hardware LUT red gamma curve (`G=0, B=0`) for extreme nocturnal eye protection — automatically turns OFF if you adjust Kelvin, switch presets, or enable Circadian mode.
+- **Hybrid Hardware Cursor Tinting:** Tints the Windows mouse cursor alongside the screen across all display modes (`0K`, Deep Crimson, Reading Themes, Invert, Grayscale, and Terminal Green) — enabled by default and toggleable via *Tint Mouse Cursor with Screen*.
 
-### 3. 🌙 Ultra-Deep Night Dimming (Beyond Monitor 0%)
-Hardware monitor buttons stop dimming at 0%, which is still painfully bright in a dark room. EyeGuard utilizes software luminance reduction to dim your screen down to 5% with **zero PWM flicker** and zero backlight bleed.
+### 3. 🌙 Ultra-Deep Night Dimming (Down to 1%)
+Hardware monitor buttons stop dimming at 0%, which is still painfully bright in a dark room. EyeGuard utilizes calibrated software luminance reduction to dim your screen smoothly down to **1%** with **zero PWM flicker** and zero backlight bleed.
 
 ### 4. ☀️ 3-Stage Circadian Solar Curve
 Automatically synchronizes screen warmth with your local sun:
