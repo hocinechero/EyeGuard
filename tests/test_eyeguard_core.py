@@ -355,6 +355,17 @@ class TestHybridDisplayEngine(unittest.TestCase):
         out_white_r = m[0][0] + m[1][0] + m[2][0] + m[4][0]
         self.assertAlmostEqual(out_white_r, 1.0, delta=0.02)
 
+    def test_baseline_ramp_validator_rejects_stale_filter(self):
+        eng, _, _, _, _ = self._make_mocked_engine()
+        stale_warm = gamma_engine.GAMMA_RAMP()
+        for i in range(256):
+            stale_warm.Red[i] = int(round((i / 255.0) * 65535))
+            stale_warm.Green[i] = int(round((i / 255.0) * 65535 * 0.44))
+            stale_warm.Blue[i] = 0
+        self.assertFalse(eng._is_valid_baseline_ramp(stale_warm))
+        linear = eng._make_linear_ramp()
+        self.assertTrue(eng._is_valid_baseline_ramp(linear))
+
     def test_tint_cursor_across_themes_and_zero_kelvin(self):
         eng, last_ramp, last_mat, _, _ = self._make_mocked_engine()
         self.assertTrue(eng.tint_cursor)
@@ -573,6 +584,58 @@ class TestConfigCircadianAndBindings(unittest.TestCase):
                 self.assertFalse(mock_eng.deep_crimson)
                 self.assertFalse(eg.tint_cursor)  # persistent preference preserved across reset_natural
                 eg.desktop_overlays.hide_toast.assert_called()
+
+    def test_app_kelvin_preset_and_circadian_clear_deep_crimson_while_brightness_preserves_it(self):
+        import app as app_mod
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            real_cm = cfg_mod.ConfigManager(config_dir=tmpdir)
+            with patch.object(app_mod, "ConfigManager", return_value=real_cm), \
+                 patch.object(app_mod, "EyeGuardGammaEngine") as MockGamma, \
+                 patch.object(app_mod, "DesktopOverlayManager"), \
+                 patch.object(app_mod, "Win32FocusRuler"), \
+                 patch.object(app_mod, "MagicWindowEngine"), \
+                 patch.object(app_mod, "HotkeyEngine"), \
+                 patch.object(app_mod, "TrayManager"), \
+                 patch("core.system_events.SystemEventsMonitor"):
+                mock_eng = MockGamma.return_value
+                mock_eng.get_monitors.return_value = []
+                mock_eng.get_hardware_brightness.return_value = 80
+                mock_eng.get_active_backend.return_value = "hardware_lut"
+
+                eg = app_mod.EyeGuardApp()
+                self.addCleanup(eg.hard_exit)
+
+                # Brightness adjustment must preserve Deep Crimson
+                eg.set_deep_crimson(True)
+                eg.set_brightness(45)
+                self.assertTrue(eg.is_deep_crimson)
+                self.assertTrue(real_cm.get("screen", "deep_crimson"))
+
+                # Moving Kelvin slider/hotkey must exit Deep Crimson and apply Kelvin
+                eg.set_kelvin(3400)
+                self.assertFalse(eg.is_deep_crimson)
+                self.assertFalse(mock_eng.deep_crimson)
+                self.assertFalse(real_cm.get("screen", "deep_crimson"))
+                self.assertEqual(eg.current_k, 3400)
+                mock_eng.set_display.assert_called_with(
+                    3400, 45, eg.is_gray, eg.is_invert, smooth=False, color_mode=eg.color_filter_mode
+                )
+
+                # Selecting a preset must exit Deep Crimson
+                eg.set_deep_crimson(True)
+                eg.apply_preset_name("Bedtime")
+                self.assertFalse(eg.is_deep_crimson)
+                self.assertFalse(mock_eng.deep_crimson)
+                self.assertFalse(real_cm.get("screen", "deep_crimson"))
+                self.assertEqual(eg.current_k, 2700)
+
+                # Enabling Circadian must exit Deep Crimson
+                eg.set_deep_crimson(True)
+                eg.toggle_circadian(True)
+                self.assertFalse(eg.is_deep_crimson)
+                self.assertFalse(mock_eng.deep_crimson)
+                self.assertFalse(real_cm.get("screen", "deep_crimson"))
 
 
 if __name__ == "__main__":

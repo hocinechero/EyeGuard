@@ -348,6 +348,11 @@ class EyeGuardGammaEngine:
             ramp.Blue[i] = val
         return ramp
 
+    def _is_valid_baseline_ramp(self, ramp: GAMMA_RAMP) -> bool:
+        """Rejects leftover tinted/dimmed filter ramps so software_dwm never double-tints."""
+        peaks = (int(ramp.Red[255]), int(ramp.Green[255]), int(ramp.Blue[255]))
+        return max(peaks) >= 60000 and min(peaks) >= 35000
+
     def _capture_original_hardware_lut(self):
         """Captures native monitor hardware LUTs cleanly per monitor (and primary DC fallback)."""
         try:
@@ -360,7 +365,9 @@ class EyeGuardGammaEngine:
                     try:
                         r = GAMMA_RAMP()
                         if gdi32.GetDeviceGammaRamp(hdc, ctypes.byref(r)):
-                            self._original_monitor_ramps[dev] = r
+                            self._original_monitor_ramps[dev] = (
+                                r if self._is_valid_baseline_ramp(r) else self._make_linear_ramp()
+                            )
                     finally:
                         gdi32.DeleteDC(hdc)
 
@@ -369,7 +376,9 @@ class EyeGuardGammaEngine:
                 try:
                     ramp = GAMMA_RAMP()
                     if gdi32.GetDeviceGammaRamp(hdc, ctypes.byref(ramp)):
-                        self._original_gamma_ramp = ramp
+                        self._original_gamma_ramp = (
+                            ramp if self._is_valid_baseline_ramp(ramp) else self._make_linear_ramp()
+                        )
                 finally:
                     user32.ReleaseDC(None, hdc)
         except Exception:

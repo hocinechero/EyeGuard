@@ -3708,6 +3708,10 @@
         }
 
         async function toggleCircadian(enabled) {
+            if (enabled) {
+                clearDeepCrimsonUiState();
+                updateBlackoutWarningBanner();
+            }
             if (window.pywebview && window.pywebview.api && window.pywebview.api.toggle_circadian) {
                 const data = await window.pywebview.api.toggle_circadian(enabled);
                 if (data) renderSolarCurveData(data);
@@ -4209,6 +4213,13 @@
             }
         }
 
+        function clearDeepCrimsonUiState() {
+            if (!isDeepCrimson) return;
+            isDeepCrimson = false;
+            const chk = document.getElementById('chk-deep-crimson');
+            if (chk && chk.checked) chk.checked = false;
+        }
+
         async function toggleDeepCrimson(enabled) {
             isDeepCrimson = !!enabled;
             const chk = document.getElementById('chk-deep-crimson');
@@ -4243,6 +4254,7 @@
             const parsedMax = sk ? parseInt(sk.max, 10) : NaN;
             const maxK = Number.isNaN(parsedMax) ? 6500 : parsedMax;
             currentK = isNaN(parsed) ? 5000 : Math.max(minK, Math.min(maxK, parsed));
+            clearDeepCrimsonUiState();
             updateKelvinText(currentK);
             updatePresetBadge();
             updateBlackoutWarningBanner();
@@ -4343,6 +4355,7 @@
             const tile = document.querySelector(`.preset-tile[data-preset="${name}"]`) || (event && event.currentTarget);
             if (tile) tile.classList.add('active');
             currentPresetKey = name;
+            clearDeepCrimsonUiState();
 
             let k = defaultK;
             let b = defaultB;
@@ -6346,7 +6359,7 @@
                         if (st.circadian_active && typeof st.current_k === 'number' && Math.abs(currentK - st.current_k) > 10) {
                             window.onCircadianUpdate(st.current_k);
                         }
-                        if (typeof st.deep_crimson === 'boolean') {
+                        if (typeof st.deep_crimson === 'boolean' && (Date.now() - lastUserSliderInteraction >= 800)) {
                             isDeepCrimson = st.deep_crimson;
                             const chkCrimsonPoll = document.getElementById('chk-deep-crimson');
                             if (chkCrimsonPoll && chkCrimsonPoll.checked !== isDeepCrimson) {

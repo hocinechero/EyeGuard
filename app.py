@@ -903,6 +903,13 @@ class EyeGuardApp:
         self.gamma_engine.set_display(6500, 100, False, False, smooth=True, color_mode="normal")
         return {"disabled": True, "until_ts": self._filter_disabled_until_ts}
 
+    def _clear_deep_crimson_if_active(self):
+        """Exits Deep Crimson override when the user explicitly selects a Kelvin temperature."""
+        if getattr(self, "is_deep_crimson", False):
+            self.is_deep_crimson = False
+            self.gamma_engine.deep_crimson = False
+            self.config_mgr.set("screen", "deep_crimson", False)
+
     def apply_preset_name(self, name: str):
         self._filter_disabled_until_ts = None
         self.gamma_engine.green_background = bool(
@@ -911,6 +918,7 @@ class EyeGuardApp:
         if self.circadian_active:
             self.circadian_active = False
             self.config_mgr.set("circadian", "enabled", False)
+        self._clear_deep_crimson_if_active()
         self.config_mgr.set("screen", "mode", str(name))
         saved_presets = self.config_mgr.get("presets", default={}) or {}
         min_k = self._get_min_kelvin()
@@ -991,6 +999,7 @@ class EyeGuardApp:
         if self.circadian_active:
             self.circadian_active = False
             self.config_mgr.set("circadian", "enabled", False)
+        self._clear_deep_crimson_if_active()
         self.current_k = max(self._get_min_kelvin(), min(6500, int(k)))
         self.gamma_engine.set_display(
             self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=False, color_mode=self.color_filter_mode
@@ -1443,6 +1452,7 @@ class EyeGuardApp:
         self.circadian_active = bool(enable)
         self.config_mgr.set("circadian", "enabled", self.circadian_active)
         if self.circadian_active:
+            self._clear_deep_crimson_if_active()
             self._circadian_wake_event.set()
         return self.get_solar_curve()
 
