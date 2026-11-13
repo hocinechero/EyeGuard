@@ -309,7 +309,8 @@
       max-width: 960px;
       margin: 0 auto;
     }
-    .demo-frame img {
+    .demo-frame img,
+    .demo-frame video {
       display: block;
       width: 100%;
       height: auto;
@@ -795,10 +796,12 @@
         </div>
 
         <div class="demo-frame">
-          <img src="assets/demo.gif" alt="EyeGuard Digital Reading Ruler in Action" width="1280" height="640" />
+          <video autoplay loop muted playsinline controls preload="auto" poster="assets/screenshots/hero_poster.png">
+            <source src="assets/videos/hero_showcase.mp4" type="video/mp4" />
+          </video>
         </div>
         <p class="demo-caption">
-          Real-time Digital Reading Ruler (<code style="font-family:var(--font-mono)">Ctrl+Alt+F</code>) isolating active lines across dense documents with zero lag.
+          <strong>EyeGuard v3.1.0 Showcase (1600×900):</strong> 0K Zero-Blue Darkroom, Deep Crimson, Cursor Tinting, Zero-Lag Reading Ruler (<code style="font-family:var(--font-mono)">Ctrl+Alt+F</code>), 22 Palettes, Circadian Solar Curve &amp; 4-Mode Breaks.
         </p>
       </div>
     </section>

@@ -56,7 +56,11 @@ winget install hocinechero.EyeGuard
 
 <div align="center">
 
-### 📖 Reading Ruler & Spotlight Focus Over Warm PDF (`4000K`)
+### ✨ Full v3.1.0 Feature Showcase (`0K Darkroom • Deep Crimson • Ruler • 22 Themes • Breaks`)
+<img src="assets/demos/hero_showcase.gif" alt="EyeGuard v3.1.0 Motion Graphics Feature Showcase" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
+<p><em>Complete walkthrough: 0K Zero-Blue Darkroom, Deep Crimson, Cursor Tinting, Zero-Lag Reading Ruler, 22 Desktop Themes, Circadian Solar Curve &amp; 4-Mode Breaks. (<a href="https://hocinechero.github.io/EyeGuard/">Watch in full 1600×900 HD MP4 ↗</a>)</em></p>
+
+### 📖 Reading Ruler &amp; Spotlight Focus Over Warm PDF (`4000K`)
 <img src="assets/demos/ruler_spotlight_demo.gif" alt="EyeGuard Reading Ruler and Spotlight Focus Live Demo" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
 <p><em>Adjusting Reading Ruler slit height &amp; dimming, then locking gaze line-by-line with Spotlight Focus across a warm 4000K PDF.</em></p>
 
