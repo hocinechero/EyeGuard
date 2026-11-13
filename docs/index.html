@@ -467,6 +467,39 @@
       border-radius: 8px;
     }
 
+    /* What's New v3.1.0 Highlight */
+    .release-banner {
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(239, 68, 68, 0.06));
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-md);
+      padding: 26px;
+      margin-bottom: 34px;
+    }
+    .release-banner-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .release-banner-head h3 {
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+    .badge-crimson {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.14);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+
     /* Comparison Table */
     .table-wrap {
       overflow-x: auto;
@@ -587,7 +620,7 @@
         <h1>The First <span>Full-Desktop E-Reader</span> &amp; Eye Care Suite for Windows</h1>
 
         <p class="hero-sub">
-          Turn every PDF viewer, browser tab, Word document, and code editor into a calm paper-like reading surface — with zero-lag Reading Ruler, Spotlight Focus, 22 reading palettes, flicker-free dimming, and 20-20-20 break protection.
+          Turn every PDF viewer, browser tab, Word document, and code editor into a calm paper-like reading surface — with zero-lag Reading Ruler, Spotlight Focus, 22 reading palettes, Deep Crimson 0K, hardware cursor tinting, 1% flicker-free dimming, and 20-20-20 break protection.
         </p>
 
         <div class="cta-group">
@@ -649,9 +682,9 @@
             <p>Kindle Paperwhite tint, Warm Sepia, Night Contrast, Terminal Slate, 15 Xodo Pro themes, plus full custom color rules per application.</p>
           </div>
           <div class="card">
-            <span class="card-tag">0K – 6500K</span>
-            <h3>Zero-Flicker Dimming</h3>
-            <p>Software luminance down to 5% with zero PWM hardware backlight flicker, paired with a 3-stage circadian solar curve.</p>
+            <span class="card-tag">0K – 6500K • Deep Crimson</span>
+            <h3>Zero-Flicker 1% Dimming</h3>
+            <p>Calibrated luminance down to 1% with zero PWM flicker, pure zero-blue/green Deep Crimson (Ruby+), hardware cursor tinting, and a 3-stage circadian curve.</p>
           </div>
           <div class="card">
             <span class="card-tag">20-20-20 Rule</span>
@@ -662,6 +695,34 @@
             <span class="card-tag">CrashGuard</span>
             <h3>Fail-Safe Gamma Recovery</h3>
             <p>An isolated Win32 watchdog restores native hardware display gamma in under 200ms if anything unexpectedly closes or crashes.</p>
+          </div>
+        </div>
+
+        <!-- What's New in v3.1.0 -->
+        <div class="release-banner" id="whats-new">
+          <div class="release-banner-head">
+            <div>
+              <span class="card-tag" style="margin-bottom:6px;">Release Notes • v3.1.0</span>
+              <h3>What&apos;s New in EyeGuard v3.1.0</h3>
+            </div>
+            <a class="btn btn-secondary" style="padding:7px 14px; font-size:0.84rem;" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0" target="_blank" rel="noopener">Full Changelog on GitHub ↗</a>
+          </div>
+          <div class="grid-3">
+            <div class="card" style="background:var(--bg-surface);">
+              <span class="badge-crimson">Deep Crimson (Ruby+)</span>
+              <h3>True Monochrome Red Darkroom</h3>
+              <p>Non-linear hardware LUT (<code>G=0, B=0</code>) tames harsh white-page glare at night, and automatically exits cleanly whenever you adjust Kelvin, select a preset, or enable Circadian mode.</p>
+            </div>
+            <div class="card" style="background:var(--bg-surface);">
+              <span class="card-tag">Hybrid LUT + DWM</span>
+              <h3>Hardware Cursor Tinting</h3>
+              <p>Enabled by default so your mouse pointer matches warm temperatures, Deep Crimson, and all 22 reading themes — or toggle OFF in one click to keep a crisp white cursor.</p>
+            </div>
+            <div class="card" style="background:var(--bg-surface);">
+              <span class="card-tag">Optics &amp; Baseline Guard</span>
+              <h3>Distinct 0K Ruby &amp; Clean Recovery</h3>
+              <p>Separates pure 0K darkroom red from 1000K ember warmth, guards baseline LUT capture against double-tinting, and expands dimming smoothly down to 1%.</p>
+            </div>
           </div>
         </div>
 
@@ -753,7 +814,7 @@
                 <td class="col-highlight">Yes (22 Palettes + Picker)</td>
               </tr>
               <tr>
-                <td>Ultra-Deep Dimming (Down to 5%)</td>
+                <td>Ultra-Deep Dimming (Down to 1%)</td>
                 <td>No</td>
                 <td>No</td>
                 <td>$20/yr</td>
