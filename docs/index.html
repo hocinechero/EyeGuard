@@ -145,6 +145,14 @@
     .nav-cta:hover {
       background: var(--accent-hover);
     }
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .nav-cta-mobile {
+      display: none;
+    }
 
     /* Hero */
     .hero {
@@ -348,6 +356,7 @@
     @media (max-width: 860px) {
       .grid-3, .grid-2 { grid-template-columns: 1fr; }
       .nav-links { display: none; }
+      .nav-cta-mobile { display: inline-flex; }
     }
 
     .card {
@@ -500,6 +509,140 @@
       margin-bottom: 10px;
     }
 
+    /* Video Showcase */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .video-grid { grid-template-columns: 1fr; }
+    }
+    .video-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 150ms ease, transform 150ms ease;
+    }
+    .video-card:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-2px);
+    }
+    .video-frame {
+      background: #0b0d10;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      overflow: hidden;
+      aspect-ratio: 16 / 10;
+    }
+    .video-frame video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .video-meta h3 {
+      font-size: 1.06rem;
+      margin-bottom: 4px;
+    }
+    .video-meta p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    /* Interactive 0K - 6500K Simulator */
+    .kelvin-sim {
+      margin-top: 22px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 24px;
+      align-items: center;
+    }
+    @media (max-width: 860px) {
+      .kelvin-sim { grid-template-columns: 1fr; }
+    }
+    .sim-slider-row {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sim-slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .sim-slider-label strong {
+      font-family: var(--font-mono);
+      color: var(--accent-hover);
+    }
+    .sim-range {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .sim-screen {
+      border-radius: 10px;
+      padding: 20px 22px;
+      border: 1px solid var(--border-strong);
+      background: #ffffff;
+      color: #111827;
+      position: relative;
+      overflow: hidden;
+      transition: filter 140ms ease, background 180ms ease, color 180ms ease;
+    }
+    .sim-screen-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.08);
+      margin-bottom: 8px;
+    }
+    .shot-caption {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .copy-hash-btn {
+      background: var(--bg-raised);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-hash-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--border-accent);
+    }
+    .info-callout {
+      margin-top: 18px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    .info-callout strong {
+      color: #fcd34d;
+    }
+
     /* Comparison Table */
     .table-wrap {
       overflow-x: auto;
@@ -599,12 +742,15 @@
       </a>
       <nav class="nav-links">
         <a href="#features">Features</a>
+        <a href="#demos">Live Videos</a>
         <a href="#screenshots">Screenshots</a>
         <a href="#compare">Compare</a>
         <a href="#security">Security</a>
+        <a href="https://www.reddit.com/r/EyeGuard/" target="_blank" rel="noopener">Community</a>
         <a href="https://github.com/hocinechero/EyeGuard" target="_blank" rel="noopener">GitHub</a>
         <a class="nav-cta" href="#download">Download Free</a>
       </nav>
+      <a class="nav-cta nav-cta-mobile" href="#download">Download</a>
     </div>
   </header>
 
@@ -749,6 +895,81 @@
             </p>
           </div>
         </div>
+
+        <!-- Interactive 0K–6500K + Deep Crimson + 1% Dimming Simulator -->
+        <div class="kelvin-sim" id="kelvin-sim">
+          <div>
+            <span class="card-tag">Interactive Spectrum Preview</span>
+            <h3 style="margin-bottom:6px;">Experience 0K Darkroom &amp; 1% Dimming</h3>
+            <p style="color:var(--text-secondary); font-size:0.91rem;">
+              Slide from crisp 6500K daylight down through warm amber to pure <strong>0K Zero-Blue Darkroom</strong>, or enable <strong>Deep Crimson (Ruby+)</strong> to preview white-glare suppression.
+            </p>
+            <div class="sim-slider-row">
+              <div class="sim-slider-label">
+                <span>Color Temperature</span>
+                <strong id="sim-k-val">2700 K (Night Comfort)</strong>
+              </div>
+              <input class="sim-range" id="sim-k-slider" type="range" min="0" max="6500" step="100" value="2700" oninput="updateSpectrumSim()" />
+            </div>
+            <div class="sim-slider-row">
+              <div class="sim-slider-label">
+                <span>Software Luminance</span>
+                <strong id="sim-b-val">75%</strong>
+              </div>
+              <input class="sim-range" id="sim-b-slider" type="range" min="1" max="100" step="1" value="75" oninput="updateSpectrumSim()" />
+            </div>
+            <div class="swatch-list" style="margin-top:14px;">
+              <button class="swatch-btn" type="button" id="btn-sim-crimson" onclick="toggleSimCrimson()">Deep Crimson (Ruby+): OFF</button>
+              <button class="swatch-btn" type="button" onclick="presetSim(0, 50, false)">0K Ruby</button>
+              <button class="swatch-btn" type="button" onclick="presetSim(6500, 100, false)">Reset 6500K</button>
+            </div>
+          </div>
+          <div class="sim-screen" id="sim-screen">
+            <span class="sim-screen-badge" id="sim-badge">2700 K · 75% Brightness</span>
+            <h4 style="margin-bottom:6px;">Live Document Glare Test</h4>
+            <p style="font-size:0.9rem; line-height:1.6;">
+              Standard monitors clip around 30%–40% hardware brightness and bottom out at orange amber. EyeGuard scales down cleanly to <strong>0K zero-blue/green</strong> and <strong>1% software brightness</strong> with zero PWM backlight flicker.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live Videos Showcase -->
+    <section id="demos">
+      <div class="container">
+        <div class="section-head">
+          <h2>Live Videos Over Real Windows Documents</h2>
+          <p>Unedited desktop recordings showing EyeGuard transforming bright PDFs and active windows in real time.</p>
+        </div>
+
+        <div class="video-grid">
+          <div class="video-card">
+            <div class="video-frame">
+              <video autoplay loop muted playsinline controls preload="metadata" poster="assets/screenshots/reading_modes.png">
+                <source src="assets/videos/ruler_spotlight_demo.mp4" type="video/mp4" />
+              </video>
+            </div>
+            <div class="video-meta">
+              <span class="card-tag" style="margin-bottom:6px;">Ctrl + Alt + F &bull; Ctrl + Alt + S</span>
+              <h3>Reading Ruler &amp; Spotlight Focus on Warm PDF</h3>
+              <p>Live slit height (<code>60px–700px</code>) and background dimming adjustments guiding gaze line-by-line across a 4000K PDF page.</p>
+            </div>
+          </div>
+
+          <div class="video-card">
+            <div class="video-frame">
+              <video autoplay loop muted playsinline controls preload="metadata" poster="assets/screenshots/warm_reading_pdf.png">
+                <source src="assets/videos/themes_demo.mp4" type="video/mp4" />
+              </video>
+            </div>
+            <div class="video-meta">
+              <span class="card-tag" style="margin-bottom:6px;">22 Authentic Palettes</span>
+              <h3>Full-Desktop Paper, E-Ink &amp; Xodo Pro Switching</h3>
+              <p>Instant one-click palette transitions across Warm Sepia, E-Ink Paper, Twilight Slate, Terminal Green, Burgundy, and OLED Dark.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -757,18 +978,21 @@
       <div class="container">
         <div class="section-head">
           <h2>Inside EyeGuard v3.1.0</h2>
-          <p>Clean dark &amp; light desktop UI built for instant adjustments and unobtrusive daily workflow.</p>
+          <p>Authentic Windows captures across every core module — zero mockups, zero telemetry.</p>
         </div>
 
         <div class="tabs">
-          <button class="tab-btn active" type="button" onclick="switchShot('assets/screenshots/dashboard.png', 'EyeGuard Color & Screen Dashboard', this)">Color &amp; Dimming Center</button>
-          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/reading_modes.png', 'Reading Ruler, Spotlight & 22 Palettes', this)">Reading &amp; Focus Suite</button>
-          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/timer_breaks.png', '20-20-20 Break Scheduler', this)">Break &amp; Rest Engine</button>
+          <button class="tab-btn active" type="button" onclick="switchShot('assets/screenshots/dashboard.png', 'EyeGuard v3.1.0 Screen & Color Center over a live PDF', 'Screen & Color Center: 0K Zero-Blue Darkroom scale, Biohacker Ruby 0K, Deep Crimson (Ruby+), and Tint Mouse Cursor toggles over a real PDF.', this)">Color, 0K &amp; Dimming</button>
+          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/warm_reading_pdf.png', 'EyeGuard warming Foxit PDF Reader to 2402K', 'Live PDF Protection: Bedtime 2402K hardware warmth softening a dense Foxit PDF document across the entire display.', this)">Warm 2402K PDF</button>
+          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/reading_modes.png', 'Reading Ruler, Spotlight & 22 Palettes', 'Reading & Focus Suite: Digital Reading Ruler, Paragraph Spotlight Mask, and 22 desktop reading palettes (Fullscreen or Per-App).', this)">Reading &amp; Focus Suite</button>
+          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/timer_breaks.png', 'Rest & Breaks 4-Mode Scheduler', 'Rest & Breaks Engine: 4 break enforcement modes (Gentle, Centered Card 40–50%, Fullscreen, Strict), Blink Reminder Preview, 20-20-20 rule, and Smart Idle Detection.', this)">Rest &amp; 4-Mode Breaks</button>
+          <button class="tab-btn" type="button" onclick="switchShot('assets/screenshots/solar_curve.png', '3-Stage Circadian Solar Curve', 'Advanced Suite: Interactive 3-stage Circadian Solar Curve (Daytime 6500K → Sunset 3400K → Bedtime 1900K) + automatic Windows Dark Mode sync.', this)">3-Stage Solar Curve</button>
         </div>
 
         <div class="shot-viewer">
-          <img id="shot-img" src="assets/screenshots/dashboard.png" alt="EyeGuard Color & Screen Dashboard" />
+          <img id="shot-img" src="assets/screenshots/dashboard.png" alt="EyeGuard v3.1.0 Screen & Color Center over a live PDF" />
         </div>
+        <p class="shot-caption" id="shot-caption">Screen &amp; Color Center: 0K Zero-Blue Darkroom scale, Biohacker Ruby 0K, Deep Crimson (Ruby+), and Tint Mouse Cursor toggles over a real PDF.</p>
       </div>
     </section>
 
@@ -792,6 +1016,13 @@
               </tr>
             </thead>
             <tbody>
+              <tr>
+                <td>True 0K Zero-Blue Darkroom &amp; Deep Crimson</td>
+                <td>No</td>
+                <td>No (1200K min)</td>
+                <td>No (2000K min)</td>
+                <td class="col-highlight">Yes (0K Pure Red + Cursor Tinting)</td>
+              </tr>
               <tr>
                 <td>Line-by-Line Reading Ruler</td>
                 <td>No</td>
@@ -825,7 +1056,7 @@
                 <td>No</td>
                 <td>No</td>
                 <td>$20/yr</td>
-                <td class="col-highlight">Yes (Win32 Idle Detection)</td>
+                <td class="col-highlight">Yes (4 Modes: Gentle, Centered Card, Full, Strict)</td>
               </tr>
               <tr>
                 <td>Fail-Safe Gamma Crash Watchdog</td>
@@ -859,24 +1090,37 @@
           <div class="checksum-row">
             <div>
               <strong>EyeGuard_Portable.zip (v3.1.0)</strong>
-              <div class="hash-code">SHA-256: 78F058A3293FCB5725EC7CB99193EFA8CAA41FBBDC30D35585AF44BAAD224283</div>
+              <div class="hash-code" id="hash-portable">SHA-256: 78F058A3293FCB5725EC7CB99193EFA8CAA41FBBDC30D35585AF44BAAD224283</div>
             </div>
-            <a class="vt-pill" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0" target="_blank" rel="noopener">Release Assets ↗</a>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="copy-hash-btn" type="button" onclick="copyText('78F058A3293FCB5725EC7CB99193EFA8CAA41FBBDC30D35585AF44BAAD224283', this)">Copy Hash</button>
+              <a class="vt-pill" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0" target="_blank" rel="noopener">Release Assets ↗</a>
+            </div>
           </div>
           <div class="checksum-row">
             <div>
               <strong>EyeGuard_Setup.exe (v3.1.0)</strong>
-              <div class="hash-code">SHA-256: 99685D825E8F0DBB3D4E99C1B42364F533E3E065A21E0518D7ED7C77986566EA</div>
+              <div class="hash-code" id="hash-setup">SHA-256: 99685D825E8F0DBB3D4E99C1B42364F533E3E065A21E0518D7ED7C77986566EA</div>
             </div>
-            <a class="vt-pill" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0" target="_blank" rel="noopener">Release Assets ↗</a>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="copy-hash-btn" type="button" onclick="copyText('99685D825E8F0DBB3D4E99C1B42364F533E3E065A21E0518D7ED7C77986566EA', this)">Copy Hash</button>
+              <a class="vt-pill" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0" target="_blank" rel="noopener">Release Assets ↗</a>
+            </div>
           </div>
           <div class="checksum-row">
             <div>
               <strong>EyeGuard-Source.zip (v3.1.0 Tag Snapshot)</strong>
-              <div class="hash-code">SHA-256: 5209D3CBA0DEA5160D7A3CFAD6D5AEED1DEBC321514169946C1BF8D0B47F576A</div>
+              <div class="hash-code" id="hash-source">SHA-256: 5209D3CBA0DEA5160D7A3CFAD6D5AEED1DEBC321514169946C1BF8D0B47F576A</div>
             </div>
-            <a class="btn btn-secondary" style="padding:6px 12px; font-size:0.82rem;" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0" target="_blank" rel="noopener">Release Notes ↗</a>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="copy-hash-btn" type="button" onclick="copyText('5209D3CBA0DEA5160D7A3CFAD6D5AEED1DEBC321514169946C1BF8D0B47F576A', this)">Copy Hash</button>
+              <a class="btn btn-secondary" style="padding:6px 12px; font-size:0.82rem;" href="https://github.com/hocinechero/EyeGuard/releases/tag/v3.1.0" target="_blank" rel="noopener">Release Notes ↗</a>
+            </div>
           </div>
+        </div>
+
+        <div class="info-callout">
+          <strong>Indie Solo Build &amp; Windows SmartScreen Note:</strong> EyeGuard is a free open-source solo project and does not carry a paid commercial Authenticode certificate yet, so Windows SmartScreen may ask for confirmation on first launch. You can verify every file against the SHA-256 hashes above, build cleanly from the open Python/Nuitka source on GitHub, or report bugs &amp; ideas on <a href="https://www.reddit.com/r/EyeGuard/" target="_blank" rel="noopener"><strong>r/EyeGuard</strong></a>.
         </div>
       </div>
     </section>
@@ -890,6 +1134,7 @@
       <div class="footer-links" style="align-items:center;">
         <a href="https://github.com/hocinechero/EyeGuard" target="_blank" rel="noopener">GitHub Repo</a>
         <a href="https://github.com/hocinechero/EyeGuard/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://www.reddit.com/r/EyeGuard/" target="_blank" rel="noopener">r/EyeGuard</a>
         <a href="https://github.com/hocinechero/EyeGuard/issues" target="_blank" rel="noopener">Issues</a>
         <a href="https://alternativeto.net/software/eyeguard/?utm_source=badge&utm_medium=referral" target="_blank" rel="noopener">
           <img src="https://alternativeto.net/static/badges/badge-compact-color.svg" alt="EyeGuard | AlternativeTo" width="136" height="44" style="display:block; border-radius:6px;" />
@@ -899,27 +1144,92 @@
   </footer>
 
   <script>
-    function copyWinget(btn) {
-      const cmd = document.getElementById("winget-cmd").textContent;
-      navigator.clipboard.writeText(cmd).then(() => {
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
         const old = btn.textContent;
         btn.textContent = "Copied!";
         setTimeout(() => { btn.textContent = old; }, 1600);
       });
     }
 
-    function switchShot(src, alt, btn) {
+    function copyWinget(btn) {
+      const cmd = document.getElementById("winget-cmd").textContent;
+      copyText(cmd, btn);
+    }
+
+    function switchShot(src, alt, caption, btn) {
       const img = document.getElementById("shot-img");
       img.src = src;
       img.alt = alt;
+      const cap = document.getElementById("shot-caption");
+      if (cap) cap.textContent = caption;
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
     }
 
+    let simCrimson = false;
+
+    function toggleSimCrimson() {
+      simCrimson = !simCrimson;
+      updateSpectrumSim();
+    }
+
+    function presetSim(k, b, crimson) {
+      document.getElementById("sim-k-slider").value = k;
+      document.getElementById("sim-b-slider").value = b;
+      simCrimson = crimson;
+      updateSpectrumSim();
+    }
+
+    function updateSpectrumSim() {
+      const k = parseInt(document.getElementById("sim-k-slider").value, 10);
+      const b = parseInt(document.getElementById("sim-b-slider").value, 10);
+      const kLbl = document.getElementById("sim-k-val");
+      const bLbl = document.getElementById("sim-b-val");
+      const btnC = document.getElementById("btn-sim-crimson");
+      const scr = document.getElementById("sim-screen");
+      const badge = document.getElementById("sim-badge");
+
+      if (btnC) {
+        btnC.classList.toggle("active", simCrimson);
+        btnC.textContent = "Deep Crimson (Ruby+): " + (simCrimson ? "ON" : "OFF");
+      }
+
+      let desc = k + " K";
+      if (k === 0) desc = "0 K (Zero-Blue Darkroom)";
+      else if (k <= 1200) desc = k + " K (Ember Darkroom)";
+      else if (k <= 2800) desc = k + " K (Night Comfort)";
+      else if (k <= 4500) desc = k + " K (Warm Reading)";
+      else if (k < 6500) desc = k + " K (Balanced)";
+      else desc = "6500 K (Original Screen)";
+
+      kLbl.textContent = simCrimson ? "Deep Crimson (G=0, B=0)" : desc;
+      bLbl.textContent = b + "%";
+      badge.textContent = (simCrimson ? "Deep Crimson · " : k + " K · ") + b + "% Brightness";
+
+      const bright = (0.14 + (b / 100) * 0.86).toFixed(2);
+      if (simCrimson || k === 0) {
+        const bgRed = simCrimson ? "#5c0f0f" : "#991b1b";
+        scr.style.background = bgRed;
+        scr.style.color = "#fecaca";
+        scr.style.filter = "brightness(" + bright + ")";
+      } else {
+        const t = k / 6500;
+        const r = 255;
+        const g = Math.round(95 + 160 * Math.pow(t, 0.8));
+        const bl = Math.round(12 + 243 * Math.pow(t, 1.35));
+        scr.style.background = "rgb(" + r + "," + g + "," + bl + ")";
+        scr.style.color = "#111827";
+        scr.style.filter = "brightness(" + bright + ")";
+      }
+    }
+
+    updateSpectrumSim();
+
     document.getElementById("swatch-list").addEventListener("click", (e) => {
       const btn = e.target.closest(".swatch-btn");
       if (!btn) return;
-      document.querySelectorAll(".swatch-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll("#swatch-list .swatch-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const page = document.getElementById("simulated-page");
       page.style.background = btn.dataset.bg;

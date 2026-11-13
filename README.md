@@ -52,11 +52,18 @@ winget install hocinechero.EyeGuard
 
 ---
 
-## 🎬 Live Demonstration
+## 🎬 Live Demonstrations
 
 <div align="center">
-  <img src="assets/demo.gif" alt="EyeGuard Desktop Reading Ruler in Action" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
-  <p><em>Watch the line-by-line Digital Reading Ruler guide your gaze effortlessly across dense text, PDFs, and code editors with zero ocular fatigue.</em></p>
+
+### 📖 Reading Ruler & Spotlight Focus Over Warm PDF (`4000K`)
+<img src="assets/demos/ruler_spotlight_demo.gif" alt="EyeGuard Reading Ruler and Spotlight Focus Live Demo" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
+<p><em>Adjusting Reading Ruler slit height &amp; dimming, then locking gaze line-by-line with Spotlight Focus across a warm 4000K PDF.</em></p>
+
+### 🎨 Live 22 Desktop Reading Palettes &amp; Xodo Pro Switching
+<img src="assets/demos/themes_demo.gif" alt="EyeGuard 22 Reading Palettes Live Demo" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
+<p><em>One-click desktop transitions across Warm Sepia, E-Ink Paper, Night Contrast, Twilight Slate, Terminal Green, and Xodo Pro palettes. (<a href="https://hocinechero.github.io/EyeGuard/#demos">Watch full HD MP4 demos on the website ↗</a>)</em></p>
+
 </div>
 
 ---
@@ -137,8 +144,9 @@ Working on complex research papers, contracts, or code? Spotlight dims your enti
 ### 1. ⏰ Clinical 20-20-20 Break Engine
 Follows the American Academy of Ophthalmology 20-20-20 rule: every 20 minutes, glance 20 feet away for 20 seconds.
 - **Win32 Automated Away Sensing:** Automatically detects when you step away from your desk and pauses the countdown so you never get interrupted immediately after sitting back down.
-- **3 Break Enforcement Modes:**
+- **4 Break Enforcement Modes:**
   - *Gentle Break:* Non-intrusive notification toast.
+  - *Centered Card:* Compact centered break card (`40–50%` coverage, skippable) so your desktop stays visible.
   - *Fullscreen Micro-Rest:* Guided breathing ring with calming eye relaxation exercises.
   - *Strict Break:* Fullscreen lock ensuring true ocular rest.
 
@@ -164,14 +172,20 @@ Automatically synchronizes screen warmth with your local sun:
 
 <div align="center">
 
-### 1. Screen & Color Calibration Center
-<img src="assets/screenshots/dashboard.png" alt="EyeGuard Main Dashboard" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+### 1. Screen & Color Calibration Center (`0K` Darkroom, Deep Crimson &amp; Cursor Tinting)
+<img src="assets/screenshots/dashboard.png" alt="EyeGuard Main Dashboard over PDF" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
-### 2. Dedicated Reading & Focus Suite (Reading Ruler, Spotlight & 22 Themes)
+### 2. Live Warm PDF Protection (`2402K` Bedtime Warmth in Foxit Reader)
+<img src="assets/screenshots/warm_reading_pdf.png" alt="EyeGuard Warming Foxit PDF Reader" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+
+### 3. Dedicated Reading & Focus Suite (Reading Ruler, Spotlight &amp; 22 Themes)
 <img src="assets/screenshots/reading_modes.png" alt="EyeGuard Reading & Focus Suite" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
-### 3. Rest & Breaks Scheduler with Live Idle Sensing
-<img src="assets/screenshots/timer_breaks.png" alt="EyeGuard Break Reminder" width="94%" style="border-radius:10px; margin-bottom: 16px;">
+### 4. Rest &amp; Breaks Scheduler (`4` Break Modes + Live Idle Sensing)
+<img src="assets/screenshots/timer_breaks.png" alt="EyeGuard Break Reminder" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+
+### 5. 3-Stage Circadian Solar Curve (`6500K → 3400K → 1900K`)
+<img src="assets/screenshots/solar_curve.png" alt="EyeGuard 3-Stage Circadian Solar Curve" width="94%" style="border-radius:10px; margin-bottom: 16px;">
 
 </div>
 
@@ -231,8 +245,9 @@ If EyeGuard relieved your eye strain or made reading on your computer comfortabl
 
 Help fellow readers, students, developers, and researchers discover EyeGuard:
 - ⭐ **Star this repository** on GitHub.
+- 💬 **Join the community, report bugs &amp; share ideas:** **[r/EyeGuard](https://www.reddit.com/r/EyeGuard/)**.
 - 👍 **Like & Recommend on [AlternativeTo](https://alternativeto.net/software/eyeguard/)** to help others find a free open-source alternative to CareUEyes and f.lux.
-- 💬 Share it on **Reddit** (`r/software`, `r/productivity`, `r/windows`, `r/eReader`).
+- 📣 Share it on **Reddit** (`r/software`, `r/productivity`, `r/windows`, `r/eReader`).
 - 🐦 Share on **X / Twitter**: [Share EyeGuard on X](https://twitter.com/intent/tweet?text=Found%20an%20open-source%20desktop%20e-reader%20and%20reading%20ruler%20for%20Windows%20that%20turns%20any%20PDF%20into%20Kindle%20paper%3A%20https%3A%2F%2Fhocinechero.github.io%2FEyeGuard%2F)
 
 <p>
