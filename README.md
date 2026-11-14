@@ -56,17 +56,17 @@ winget install hocinechero.EyeGuard
 
 <div align="center">
 
-### ✨ Full v4.0.0 Feature Showcase (`0K Darkroom • Deep Crimson • Ruler • 22 Themes • Breaks`)
-<img src="assets/demos/hero_showcase.gif" alt="EyeGuard v4.0.0 Motion Graphics Feature Showcase" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
-<p><em>Complete walkthrough: 0K Zero-Blue Darkroom, Deep Crimson, Cursor Tinting, Zero-Lag Reading Ruler, 22 Desktop Themes, Circadian Solar Curve &amp; 4-Mode Breaks. (<a href="https://hocinechero.github.io/EyeGuard/">Watch in full 1600×900 HD MP4 ↗</a>)</em></p>
+### ✨ Full v4.0.0 Studio Launch Showcase (`0K Darkroom • 6500K→3360K • 7-Filter Mosaic • Ruler • 22 Themes • Breaks`)
+<img src="assets/demos/hero_showcase.gif" alt="EyeGuard v4.0.0 Studio Launch Motion Graphics Showcase" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
+<p><em>2x README walkthrough preview: Sanctuary 4.0 UI, 6500K→3360K PDF calibration, 7-filter diagonal mosaic, zero-lag Reading Ruler, 22 desktop palettes &amp; crimson Blink Hydration pill. (<a href="https://hocinechero.github.io/EyeGuard/">Watch in Full HD 1920×1080 60fps MP4 with Studio Audio ↗</a>)</em></p>
 
-### 📖 Reading Ruler &amp; Spotlight Focus Over Warm PDF (`4000K`)
-<img src="assets/demos/ruler_spotlight_demo.gif" alt="EyeGuard Reading Ruler and Spotlight Focus Live Demo" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
-<p><em>Adjusting Reading Ruler slit height &amp; dimming, then locking gaze line-by-line with Spotlight Focus across a warm 4000K PDF.</em></p>
+### 📖 Zero-Lag Reading Ruler Over Balanced `3500K` PDF
+<img src="assets/demos/ruler_spotlight_demo.gif" alt="EyeGuard Zero-Lag Reading Ruler Live Demo" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
+<p><em>Adjusting Reading Ruler slit height &amp; surround dimming smoothly line-by-line across an active legal PDF.</em></p>
 
-### 🎨 Live 22 Desktop Reading Palettes &amp; Xodo Pro Switching
-<img src="assets/demos/themes_demo.gif" alt="EyeGuard 22 Reading Palettes Live Demo" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
-<p><em>One-click desktop transitions across Warm Sepia, E-Ink Paper, Night Contrast, Twilight Slate, Terminal Green, and Xodo Pro palettes. (<a href="https://hocinechero.github.io/EyeGuard/#demos">Watch full HD MP4 demos on the website ↗</a>)</em></p>
+### 🎨 Live 22 Desktop Palettes &amp; Custom RGB Picker Over PDF
+<img src="assets/demos/themes_demo.gif" alt="EyeGuard 22 Reading Palettes & Custom Picker Live Demo" width="94%" style="border-radius:12px; box-shadow: 0 16px 40px rgba(0,0,0,0.35);">
+<p><em>One-click desktop transitions across ReadEra (7), Xodo Pro (15), and live RGB Custom Color Picker over an active PDF. (<a href="https://hocinechero.github.io/EyeGuard/#demos">Watch full HD MP4 demos on the website ↗</a>)</em></p>
 
 </div>
 
@@ -176,19 +176,22 @@ Automatically synchronizes screen warmth with your local sun:
 
 <div align="center">
 
-### 1. Screen & Color Calibration Center (`0K` Darkroom, Deep Crimson &amp; Cursor Tinting)
-<img src="assets/screenshots/dashboard.png" alt="EyeGuard Main Dashboard over PDF" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+### 1. Sanctuary 4.0 Dual-Theme Calibration (`0K` Darkroom, Comfort Scenes &amp; Ruby+)
+<img src="assets/screenshots/dashboard.png" alt="EyeGuard Sanctuary 4.0 Dark & Warm Light Comfort Scenes" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
-### 2. Live Warm PDF Protection (`4000K` Focused Reading Mode)
-<img src="assets/screenshots/warm_reading_pdf.png" alt="EyeGuard 4000K Focused Reading Mode over PDF" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+### 2. Aligned Before/After PDF Protection (`Native 6500K` vs `3360K Bedtime Warm`)
+<img src="assets/screenshots/warm_reading_pdf.png" alt="EyeGuard 6500K vs 3360K Bedtime Warm PDF Comparison" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
-### 3. Dedicated Reading & Focus Suite (Reading Ruler, Spotlight &amp; 22 Themes)
+### 3. 7-Filter Diagonal Split Mosaic Over Live Document
+<img src="assets/screenshots/reading_palettes_mosaic.png" alt="EyeGuard 7-Palette Diagonal Split Mosaic" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+
+### 4. Reading &amp; Focus Suite (Reading Ruler, Spotlight &amp; 22 Palettes)
 <img src="assets/screenshots/reading_modes.png" alt="EyeGuard Reading & Focus Suite" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
-### 4. Rest &amp; Breaks Scheduler (`4` Break Modes + Live Idle Sensing)
-<img src="assets/screenshots/timer_breaks.png" alt="EyeGuard Break Reminder" width="94%" style="border-radius:10px; margin-bottom: 24px;">
+### 5. Custom Timers, Crimson Blink Hydration Pill &amp; 4-Mode Breaks
+<img src="assets/screenshots/timer_breaks.png" alt="EyeGuard Break Reminder & Eye Hydration Pill" width="94%" style="border-radius:10px; margin-bottom: 24px;">
 
-### 5. 3-Stage Circadian Solar Curve (`6500K → 3400K → 1900K`)
+### 6. 3-Stage Circadian Solar Curve (`6500K → 3400K → 1900K`)
 <img src="assets/screenshots/solar_curve.png" alt="EyeGuard 3-Stage Circadian Solar Curve" width="94%" style="border-radius:10px; margin-bottom: 16px;">
 
 </div>
