@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 
 DEFAULT_CONFIG = {
-    "version": "3.1.0",
+    "version": "4.0.0",
     "screen": {
         "enabled": True,
         "mode": "Health",
@@ -43,6 +43,7 @@ DEFAULT_CONFIG = {
         "enable_pomodoro": True,
         "work_minutes": 45,
         "short_break_minutes": 5,
+        "short_break_seconds": 300,
         "long_break_minutes": 15,
         "long_break_interval": 0,
         "enable_20_20_rule": True,

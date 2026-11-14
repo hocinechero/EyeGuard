@@ -16,6 +16,7 @@ import math
 import os
 import queue
 import struct
+import sys
 import threading
 import time
 import wave
@@ -200,6 +201,26 @@ user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
 user32.ReleaseDC.restype = ctypes.c_int
 gdiplus.GdipCreateFromHDC.argtypes = [wintypes.HDC, ctypes.POINTER(ctypes.c_void_p)]
 gdiplus.GdipCreateFromHDC.restype = ctypes.c_int
+gdiplus.GdipNewPrivateFontCollection.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+gdiplus.GdipNewPrivateFontCollection.restype = ctypes.c_int
+gdiplus.GdipDeletePrivateFontCollection.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+gdiplus.GdipDeletePrivateFontCollection.restype = ctypes.c_int
+gdiplus.GdipPrivateAddFontFile.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+gdiplus.GdipPrivateAddFontFile.restype = ctypes.c_int
+gdiplus.GdipCreateFontFamilyFromName.argtypes = [
+    ctypes.c_wchar_p,
+    ctypes.c_void_p,
+    ctypes.POINTER(ctypes.c_void_p),
+]
+gdiplus.GdipCreateFontFamilyFromName.restype = ctypes.c_int
+gdiplus.GdipCreateFont.argtypes = [
+    ctypes.c_void_p,
+    ctypes.c_float,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.POINTER(ctypes.c_void_p),
+]
+gdiplus.GdipCreateFont.restype = ctypes.c_int
 
 gdi32.CreateDIBSection.argtypes = [
     wintypes.HDC,
@@ -435,9 +456,11 @@ class DesktopOverlayManager:
         self._toast_last_w = 0
         self._toast_last_h = 0
         self._gdiplus_token = ctypes.c_ulong()
+        self._private_font_collection = ctypes.c_void_p()
         startup_in = GdiplusStartupInput(1, None, False, False)
         try:
             gdiplus.GdiplusStartup(ctypes.byref(self._gdiplus_token), ctypes.byref(startup_in), None)
+            self._init_private_fonts()
         except Exception:
             pass
 
@@ -478,6 +501,12 @@ class DesktopOverlayManager:
         self._wake_event.set()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=1.5)
+        if hasattr(self, "_private_font_collection") and self._private_font_collection.value:
+            try:
+                gdiplus.GdipDeletePrivateFontCollection(ctypes.byref(self._private_font_collection))
+                self._private_font_collection = ctypes.c_void_p(0)
+            except Exception:
+                pass
         if hasattr(self, "_gdiplus_token") and self._gdiplus_token.value:
             try:
                 gdiplus.GdiplusShutdown(self._gdiplus_token)
@@ -647,22 +676,193 @@ class DesktopOverlayManager:
         gdiplus.GdipClosePathFigure(path)
         return path
 
+    @staticmethod
+    def _resolve_bundled_font_paths():
+        """Locate bundled custom .ttf font files across frozen builds and source checkouts."""
+        font_names = ("LinBiolinum_RB_G.ttf", "thmanyahseriftext-Black.otf")
+        candidate_dirs = []
+        if hasattr(sys, "_MEIPASS"):
+            candidate_dirs.append(os.path.join(sys._MEIPASS, "assets", "fonts"))
+        exe_dir = os.path.dirname(sys.executable)
+        candidate_dirs.append(os.path.join(exe_dir, "assets", "fonts"))
+        candidate_dirs.append(os.path.join(exe_dir, "_internal", "assets", "fonts"))
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidate_dirs.append(os.path.join(repo_root, "assets", "fonts"))
+
+        resolved = []
+        seen = set()
+        for font_name in font_names:
+            for directory in candidate_dirs:
+                path = os.path.join(directory, font_name)
+                if path not in seen and os.path.isfile(path):
+                    seen.add(path)
+                    resolved.append(path)
+                    break
+        return resolved
+
+    def _init_private_fonts(self) -> None:
+        """Load bundled toast typography into an isolated GDI+ PrivateFontCollection."""
+        paths = self._resolve_bundled_font_paths()
+        if not paths:
+            return
+        pfc = ctypes.c_void_p()
+        if gdiplus.GdipNewPrivateFontCollection(ctypes.byref(pfc)) != 0 or not pfc.value:
+            return
+        loaded = 0
+        for path in paths:
+            if gdiplus.GdipPrivateAddFontFile(pfc, path) == 0:
+                loaded += 1
+        if loaded > 0:
+            self._private_font_collection = pfc
+        else:
+            gdiplus.GdipDeletePrivateFontCollection(ctypes.byref(pfc))
+
+    @staticmethod
+    def _toast_font_candidates(role: str = "sub"):
+        """Return ordered font-family candidates tuned by optical role."""
+        if role == "tag":
+            return ("Linux Biolinum G", "Segoe UI Variable Text Bold", "Segoe UI Bold", "Segoe UI")
+        if role == "ui":
+            return ("Linux Biolinum G", "Segoe UI Variable Text Bold", "Segoe UI Bold", "Segoe UI")
+        return ("thmanyah serif text Black", "Elephant", "Segoe UI Variable Display Semibold", "Segoe UI Semibold", "Segoe UI")
+
+    def _create_font_family(self, candidates) -> ctypes.c_void_p:
+        """Instantiate the first available GDI+ font family from private or system collections."""
+        pfc = getattr(self, "_private_font_collection", None)
+        collections = (pfc, None) if (pfc and pfc.value) else (None,)
+        for family_name in candidates:
+            for collection in collections:
+                ff = ctypes.c_void_p()
+                status = gdiplus.GdipCreateFontFamilyFromName(
+                    family_name, collection, ctypes.byref(ff)
+                )
+                if status == 0 and ff.value:
+                    return ff
+        ff = ctypes.c_void_p()
+        gdiplus.GdipGetGenericFontFamilySansSerif(ctypes.byref(ff))
+        return ff
+
+    @staticmethod
+    def _create_typographic_format(align: int = 0, line_align: int = 0) -> ctypes.c_void_p:
+        """Clone GenericTypographic StringFormat to strip GDI+ fake leading and sidebearings."""
+        generic_sf = ctypes.c_void_p()
+        gdiplus.GdipStringFormatGetGenericTypographic(ctypes.byref(generic_sf))
+        sf = ctypes.c_void_p()
+        if generic_sf.value:
+            gdiplus.GdipCloneStringFormat(generic_sf, ctypes.byref(sf))
+        else:
+            gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(sf))
+        flags = 0x00001000 | 0x00004000  # NoWrap | MeasureTrailingSpaces
+        gdiplus.GdipSetStringFormatFlags(sf, flags)
+        gdiplus.GdipSetStringFormatTrimming(sf, 3)  # EllipsisCharacter
+        gdiplus.GdipSetStringFormatAlign(sf, align)
+        gdiplus.GdipSetStringFormatLineAlign(sf, line_align)
+        return sf
+
+    def _measure_text_ink_bounds(
+        self, candidates, px_size: float, font_style: int, text: str
+    ):
+        """Measure pixel-exact ink offsets (left_pad, top_pad, right_pad, ink_w, ink_h), cached."""
+        clean = (text or "").strip()
+        if not clean:
+            return (0.0, 0.0, 0.0, 0.0, float(px_size) * 0.72)
+
+        cache = getattr(self, "_ink_metrics_cache", None)
+        if cache is None:
+            cache = {}
+            self._ink_metrics_cache = cache
+
+        key = (tuple(candidates), round(float(px_size), 2), int(font_style), clean)
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
+        mw, mh = 480, 64
+        bmi = BITMAPINFO()
+        bmi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+        bmi.bmiHeader.biWidth = mw
+        bmi.bmiHeader.biHeight = -mh
+        bmi.bmiHeader.biPlanes = 1
+        bmi.bmiHeader.biBitCount = 32
+        bmi.bmiHeader.biCompression = 0
+
+        p_bits = ctypes.c_void_p()
+        hdc_screen = user32.GetDC(None)
+        hdc_tmp = gdi32.CreateCompatibleDC(hdc_screen)
+        hbm_tmp = gdi32.CreateDIBSection(hdc_tmp, ctypes.byref(bmi), 0, ctypes.byref(p_bits), None, 0)
+        old_tmp = gdi32.SelectObject(hdc_tmp, hbm_tmp)
+        user32.ReleaseDC(None, hdc_screen)
+
+        if not p_bits.value:
+            gdi32.SelectObject(hdc_tmp, old_tmp)
+            gdi32.DeleteObject(hbm_tmp)
+            gdi32.DeleteDC(hdc_tmp)
+            return (0.0, 0.0, 0.0, float(len(clean)) * px_size * 0.5, float(px_size) * 0.72)
+
+        ctypes.memset(p_bits, 0, mw * mh * 4)
+        gfx = ctypes.c_void_p()
+        gdiplus.GdipCreateFromHDC(hdc_tmp, ctypes.byref(gfx))
+        gdiplus.GdipSetTextRenderingHint(gfx, 4)  # AntiAlias
+
+        ff = self._create_font_family(candidates)
+        font = ctypes.c_void_p()
+        gdiplus.GdipCreateFont(ff, ctypes.c_float(px_size), font_style, 2, ctypes.byref(font))  # UnitPixel
+        sf = self._create_typographic_format()
+        brush = ctypes.c_void_p()
+        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFFFFFFFF), ctypes.byref(brush))
+
+        box_x, box_y, box_w, box_h = 24.0, 12.0, float(mw - 48), float(mh - 20)
+        rect = RectF(box_x, box_y, box_w, box_h)
+        gdiplus.GdipDrawString(gfx, clean, -1, font, ctypes.byref(rect), sf, brush)
+
+        alpha_plane = bytes((ctypes.c_ubyte * (mw * mh * 4)).from_address(p_bits.value))[3::4]
+        min_x, min_y, max_x, max_y = mw, mh, -1, -1
+        for y in range(mh):
+            row_start = y * mw
+            row_alpha = alpha_plane[row_start : row_start + mw]
+            if max(row_alpha) > 16:
+                if y < min_y:
+                    min_y = y
+                if y > max_y:
+                    max_y = y
+                for x, val in enumerate(row_alpha):
+                    if val > 16:
+                        if x < min_x:
+                            min_x = x
+                        if x > max_x:
+                            max_x = x
+
+        gdiplus.GdipDeleteBrush(brush)
+        gdiplus.GdipDeleteStringFormat(sf)
+        gdiplus.GdipDeleteFont(font)
+        gdiplus.GdipDeleteFontFamily(ff)
+        gdiplus.GdipDeleteGraphics(gfx)
+        gdi32.SelectObject(hdc_tmp, old_tmp)
+        gdi32.DeleteObject(hbm_tmp)
+        gdi32.DeleteDC(hdc_tmp)
+
+        if max_x < min_x or max_y < min_y:
+            result = (0.0, 0.0, 0.0, float(len(clean)) * px_size * 0.5, float(px_size) * 0.72)
+        else:
+            left_pad = float(min_x) - box_x
+            top_pad = float(min_y) - box_y
+            right_pad = (box_x + box_w) - float(max_x + 1)
+            ink_w = float(max_x - min_x + 1)
+            ink_h = float(max_y - min_y + 1)
+            result = (left_pad, top_pad, right_pad, ink_w, ink_h)
+
+        if len(cache) > 64:
+            cache.clear()
+        cache[key] = result
+        return result
+
     def _hit_test_toast(self, x: int, y: int) -> Optional[str]:
         if not self.toast_is_prompt:
             return None
         w, h = self.toast_w, self.toast_h
-        is_rtl = any(
-            "\u0600" <= c <= "\u06ff"
-            for c in f"{self.toast_title} {self.toast_subtitle}"
-        )
-        if is_rtl:
-            btn_postpone = (122.0, 18.0, 100.0, 30.0)
-            btn_skip = (48.0, 18.0, 64.0, 30.0)
-            close_cx, close_cy = 24.0, float(h / 2.0)
-        else:
-            btn_postpone = (296.0, 18.0, 114.0, 30.0)
-            btn_skip = (418.0, 18.0, 64.0, 30.0)
-            close_cx, close_cy = float(w - 22.0), float(h / 2.0)
+        btn_postpone = (296.0, 18.0, 114.0, 30.0)
+        btn_skip = (418.0, 18.0, 64.0, 30.0)
+        close_cx, close_cy = float(w - 22.0), float(h / 2.0)
 
         # Check close (circle r=14)
         if (x - close_cx) ** 2 + (y - close_cy) ** 2 <= 196:
@@ -751,7 +951,7 @@ class DesktopOverlayManager:
             gdi32.SetTextColor(hdc, 0x00F8FAFC)
             font_h = 16 if self.mini_style == "bar" else 19
             hfont = gdi32.CreateFontW(
-                -font_h, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI"
+                -font_h, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Linux Biolinum G"
             )
             old_font = gdi32.SelectObject(hdc, hfont)
 
@@ -826,21 +1026,28 @@ class DesktopOverlayManager:
         graphics = ctypes.c_void_p()
         gdiplus.GdipCreateFromHDC(self._toast_hdc_mem, ctypes.byref(graphics))
         gdiplus.GdipSetSmoothingMode(graphics, 2)  # AntiAlias
-        gdiplus.GdipSetTextRenderingHint(graphics, 4)  # AntiAliasGridFit
+        gdiplus.GdipSetTextRenderingHint(graphics, 4)  # AntiAlias
 
         try:
-            is_rtl = any(
-                "\u0600" <= c <= "\u06ff"
-                for c in f"{self.toast_title} {self.toast_subtitle}"
-            )
             if self.toast_is_prompt:
-                self._render_interactive_toast(graphics, w, h, progress, is_rtl)
+                self._render_interactive_toast(graphics, w, h, progress)
             else:
-                self._render_blink_toast(graphics, w, h, progress, is_rtl)
+                self._render_blink_toast(graphics, w, h, progress)
         finally:
             gdiplus.GdipDeleteGraphics(graphics)
 
-        blend = BLENDFUNCTION(0, 0, 255, 1)
+        master_alpha = 255
+        if not self.toast_is_prompt and self.toast_visible:
+            now_mono = time.monotonic()
+            elapsed = max(0.0, now_mono - self.toast_start_ts)
+            remaining = max(0.0, self.toast_expire_ts - now_mono)
+            fade_in = min(1.0, elapsed / 0.35)
+            fade_out = min(1.0, remaining / 0.45)
+            t_ease = max(0.0, min(fade_in, fade_out))
+            t_ease = t_ease * t_ease * (3.0 - 2.0 * t_ease)
+            master_alpha = max(0, min(255, int(246 * t_ease)))
+
+        blend = BLENDFUNCTION(0, 0, master_alpha, 1)
         pt_src = wintypes.POINT(0, 0)
         pt_dest = wintypes.POINT(self.toast_x, self.toast_y)
         size_dest = wintypes.SIZE(w, h)
@@ -860,139 +1067,237 @@ class DesktopOverlayManager:
         user32.ReleaseDC(None, hdc_screen)
         user32.ShowWindow(self.hwnd_toast, 4)  # SW_SHOWNOACTIVATE
 
-    def _render_blink_toast(
-        self, graphics: ctypes.c_void_p, w: int, h: int, progress: float, is_rtl: bool
-    ) -> None:
-        # 1. Pill Capsule Shape
-        path = ctypes.c_void_p()
-        gdiplus.GdipCreatePath(0, ctypes.byref(path))
-        d = float(h - 1)
-        gdiplus.GdipAddPathArc(path, ctypes.c_float(0.5), ctypes.c_float(0.5), ctypes.c_float(d), ctypes.c_float(d), ctypes.c_float(90), ctypes.c_float(180))
-        gdiplus.GdipAddPathLine(path, ctypes.c_float(d / 2), ctypes.c_float(0.5), ctypes.c_float(w - 1 - d / 2), ctypes.c_float(0.5))
-        gdiplus.GdipAddPathArc(path, ctypes.c_float(w - 1 - d), ctypes.c_float(0.5), ctypes.c_float(d), ctypes.c_float(d), ctypes.c_float(270), ctypes.c_float(180))
-        gdiplus.GdipAddPathLine(path, ctypes.c_float(w - 1 - d / 2), ctypes.c_float(d), ctypes.c_float(d / 2), ctypes.c_float(d))
-        gdiplus.GdipClosePathFigure(path)
+    @staticmethod
+    def _blink_openness(elapsed_sec: float) -> float:
+        """Returns eyelid openness in [0.0, 1.0] with two soft natural blinks."""
+        for start in (0.75, 1.85):
+            end = start + 0.48
+            if start <= elapsed_sec <= end:
+                phase = (elapsed_sec - start) / 0.48
+                return max(0.0, 0.5 * (1.0 + math.cos(2.0 * math.pi * phase)))
+        return 1.0
 
-        # Translucent Obsidian Glass (#0D141C / 95% opacity)
+    def _render_blink_toast(
+        self, graphics: ctypes.c_void_p, w: int, h: int, progress: float
+    ) -> None:
+        elapsed = max(0.0, time.monotonic() - self.toast_start_ts)
+        openness = self._blink_openness(elapsed)
+
+        # Gentle rhythmic breathing pulse + expanding halo ripple across the entire pill
+        pulse = 0.5 - 0.5 * math.cos(2.0 * math.pi * (elapsed / 1.40))
+        ripple = (elapsed * 0.78) % 1.0
+        pad = 5.0
+        pill_w = float(w) - pad * 2.0
+        pill_h = float(h) - pad * 2.0
+        pill_r = pill_h / 2.0
+
+        # 0. Expanding Attention Ripple Halo around the entire capsule
+        ripple_expand = 4.4 * ripple
+        ripple_alpha = int(170 * ((1.0 - ripple) ** 1.45))
+        if ripple_alpha > 4:
+            r_path = self._create_pill_path(
+                pad - ripple_expand,
+                pad - ripple_expand,
+                pill_w + ripple_expand * 2.0,
+                pill_h + ripple_expand * 2.0,
+                pill_r + ripple_expand,
+            )
+            r_pen = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(
+                ctypes.c_uint32((ripple_alpha << 24) | 0x00FF4557),
+                ctypes.c_float(2.0),
+                2,
+                ctypes.byref(r_pen),
+            )
+            gdiplus.GdipDrawPath(graphics, r_pen, r_path)
+            gdiplus.GdipDeletePen(r_pen)
+            gdiplus.GdipDeletePath(r_path)
+
+        # 1. Spacious Capsule Pill with Soft Breathing Red Frame & Sweeping Satin Sheen
+        path = self._create_pill_path(pad, pad, pill_w, pill_h, pill_r)
+
+        # Deep obsidian background (#0E1520 @ 95%)
         bg_brush = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xF20D141C), ctypes.byref(bg_brush))
+        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xF20E1520), ctypes.byref(bg_brush))
         gdiplus.GdipFillPath(graphics, bg_brush, path)
         gdiplus.GdipDeleteBrush(bg_brush)
 
-        # Glowing subtle teal rim border (1.2px)
+        # Clipped whole-pill interior effects: breathing crimson wash + velvety smooth sheen sweep
+        gdiplus.GdipSetClipPath(graphics, path, 0)
+
+        wash_alpha = int(12 + 22 * pulse)
+        wash_brush = ctypes.c_void_p()
+        gdiplus.GdipCreateSolidFill(
+            ctypes.c_uint32((wash_alpha << 24) | 0x00FF3B4E), ctypes.byref(wash_brush)
+        )
+        gdiplus.GdipFillPath(graphics, wash_brush, path)
+        gdiplus.GdipDeleteBrush(wash_brush)
+
+        sweep_cycle = (elapsed % 1.45) / 1.45
+        sx = -75.0 + sweep_cycle * (float(w) + 150.0)
+        for step in range(-12, 13):
+            offset = step * 3.0
+            norm = step / 6.0
+            gauss = math.exp(-(norm * norm))
+            s_alpha = int(18.0 * gauss)
+            if s_alpha < 1:
+                continue
+            sheen_pen = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(
+                ctypes.c_uint32((s_alpha << 24) | 0x00FFE4E6),
+                ctypes.c_float(4.5),
+                2,
+                ctypes.byref(sheen_pen),
+            )
+            gdiplus.GdipDrawLine(
+                graphics,
+                sheen_pen,
+                ctypes.c_float(sx + offset - 18.0),
+                ctypes.c_float(float(h) + 8.0),
+                ctypes.c_float(sx + offset + 18.0),
+                ctypes.c_float(-8.0),
+            )
+            gdiplus.GdipDeletePen(sheen_pen)
+
+        gdiplus.GdipResetClip(graphics)
+
+        # Breathing feathered red halo + bright luminous crimson frame
+        bloom_alpha = int(42 + 46 * pulse)
+        bloom_pen = ctypes.c_void_p()
+        gdiplus.GdipCreatePen1(
+            ctypes.c_uint32((bloom_alpha << 24) | 0x00FF3B4E),
+            ctypes.c_float(4.4),
+            2,
+            ctypes.byref(bloom_pen),
+        )
+        gdiplus.GdipDrawPath(graphics, bloom_pen, path)
+        gdiplus.GdipDeletePen(bloom_pen)
+
+        rim_alpha = int(218 + 37 * pulse)
         rim_pen = ctypes.c_void_p()
-        gdiplus.GdipCreatePen1(ctypes.c_uint32(0x602DD4BF), ctypes.c_float(1.2), 2, ctypes.byref(rim_pen))
+        gdiplus.GdipCreatePen1(
+            ctypes.c_uint32((rim_alpha << 24) | 0x00FF4557),
+            ctypes.c_float(1.6),
+            2,
+            ctypes.byref(rim_pen),
+        )
         gdiplus.GdipDrawPath(graphics, rim_pen, path)
         gdiplus.GdipDeletePen(rim_pen)
         gdiplus.GdipDeletePath(path)
 
-        # 2. Glowing Orb Badge with Eyelid Vector
-        if is_rtl:
-            cx = float(w - 28.0)
-            dx = cx - 10.5
-        else:
-            cx = 28.0
-            dx = cx + 10.5
-        cy = float(h / 2)
-        orb_r = 16.0
-        dy = cy + 10.5
+        # 2. Calm Orb with Gentle Blinking Eye + Integrated Progress Ring
+        cx = 35.0
+        cy = float(h) / 2.0
+        orb_r = 16.5
 
-        # Orb Halo
         halo = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x2514B8A6), ctypes.byref(halo))
-        gdiplus.GdipFillEllipse(graphics, halo, ctypes.c_float(cx - orb_r - 2), ctypes.c_float(cy - orb_r - 2), ctypes.c_float((orb_r + 2) * 2), ctypes.c_float((orb_r + 2) * 2))
+        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x1CF5C26B), ctypes.byref(halo))
+        gdiplus.GdipFillEllipse(graphics, halo, ctypes.c_float(cx - orb_r - 2.5), ctypes.c_float(cy - orb_r - 2.5), ctypes.c_float((orb_r + 2.5) * 2), ctypes.c_float((orb_r + 2.5) * 2))
         gdiplus.GdipDeleteBrush(halo)
 
-        # Orb Body
         orb_body = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x4014B8A6), ctypes.byref(orb_body))
+        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x28F5C26B), ctypes.byref(orb_body))
         gdiplus.GdipFillEllipse(graphics, orb_body, ctypes.c_float(cx - orb_r), ctypes.c_float(cy - orb_r), ctypes.c_float(orb_r * 2), ctypes.c_float(orb_r * 2))
         gdiplus.GdipDeleteBrush(orb_body)
 
-        # Orb Rim
-        orb_pen = ctypes.c_void_p()
-        gdiplus.GdipCreatePen1(ctypes.c_uint32(0x802DD4BF), ctypes.c_float(1.2), 2, ctypes.byref(orb_pen))
-        gdiplus.GdipDrawEllipse(graphics, orb_pen, ctypes.c_float(cx - orb_r), ctypes.c_float(cy - orb_r), ctypes.c_float(orb_r * 2), ctypes.c_float(orb_r * 2))
-        gdiplus.GdipDeletePen(orb_pen)
+        orb_track = ctypes.c_void_p()
+        gdiplus.GdipCreatePen1(ctypes.c_uint32(0x30FAF8F5), ctypes.c_float(1.3), 2, ctypes.byref(orb_track))
+        gdiplus.GdipDrawEllipse(graphics, orb_track, ctypes.c_float(cx - orb_r), ctypes.c_float(cy - orb_r), ctypes.c_float(orb_r * 2), ctypes.c_float(orb_r * 2))
+        gdiplus.GdipDeletePen(orb_track)
 
-        # Smooth Vector Eyelid Contours (cubic beziers)
+        if progress > 0.01:
+            orb_prog = ctypes.c_void_p()
+            gdiplus.GdipCreatePen1(ctypes.c_uint32(0xD8F5C26B), ctypes.c_float(1.5), 2, ctypes.byref(orb_prog))
+            sweep = ctypes.c_float(360.0 * progress)
+            gdiplus.GdipDrawArc(graphics, orb_prog, ctypes.c_float(cx - orb_r), ctypes.c_float(cy - orb_r), ctypes.c_float(orb_r * 2), ctypes.c_float(orb_r * 2), ctypes.c_float(-90.0), sweep)
+            gdiplus.GdipDeletePen(orb_prog)
+
+        # Animated Eyelid Vector (closes gently down to a peaceful crescent)
+        closed_dip = 1.8 * (1.0 - openness)
+        top_ctrl_y = cy - 6.4 * openness + closed_dip
+        bot_ctrl_y = cy + 6.0 * openness + closed_dip
+        corner_y = cy + 0.8 * (1.0 - openness)
+
         eye_path = ctypes.c_void_p()
         gdiplus.GdipCreatePath(0, ctypes.byref(eye_path))
-        gdiplus.GdipAddPathBezier(eye_path, ctypes.c_float(cx - 9.5), ctypes.c_float(cy), ctypes.c_float(cx - 4.5), ctypes.c_float(cy - 7.0), ctypes.c_float(cx + 4.5), ctypes.c_float(cy - 7.0), ctypes.c_float(cx + 9.5), ctypes.c_float(cy))
-        gdiplus.GdipAddPathBezier(eye_path, ctypes.c_float(cx + 9.5), ctypes.c_float(cy), ctypes.c_float(cx + 4.5), ctypes.c_float(cy + 7.0), ctypes.c_float(cx - 4.5), ctypes.c_float(cy + 7.0), ctypes.c_float(cx - 9.5), ctypes.c_float(cy))
-        gdiplus.GdipClosePathFigure(eye_path)
+        gdiplus.GdipAddPathBezier(
+            eye_path,
+            ctypes.c_float(cx - 8.5), ctypes.c_float(corner_y),
+            ctypes.c_float(cx - 4.0), ctypes.c_float(top_ctrl_y),
+            ctypes.c_float(cx + 4.0), ctypes.c_float(top_ctrl_y),
+            ctypes.c_float(cx + 8.5), ctypes.c_float(corner_y),
+        )
+        if openness > 0.14:
+            gdiplus.GdipAddPathBezier(
+                eye_path,
+                ctypes.c_float(cx + 8.5), ctypes.c_float(corner_y),
+                ctypes.c_float(cx + 4.0), ctypes.c_float(bot_ctrl_y),
+                ctypes.c_float(cx - 4.0), ctypes.c_float(bot_ctrl_y),
+                ctypes.c_float(cx - 8.5), ctypes.c_float(corner_y),
+            )
+            gdiplus.GdipClosePathFigure(eye_path)
 
         eye_pen = ctypes.c_void_p()
-        gdiplus.GdipCreatePen1(ctypes.c_uint32(0xFF2DD4BF), ctypes.c_float(1.8), 2, ctypes.byref(eye_pen))
+        gdiplus.GdipCreatePen1(ctypes.c_uint32(0xFFFAF8F5), ctypes.c_float(1.6), 2, ctypes.byref(eye_pen))
         gdiplus.GdipDrawPath(graphics, eye_pen, eye_path)
         gdiplus.GdipDeletePen(eye_pen)
         gdiplus.GdipDeletePath(eye_path)
 
-        # Filled Pupil
-        pupil = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(pupil))
-        gdiplus.GdipFillEllipse(graphics, pupil, ctypes.c_float(cx - 3.0), ctypes.c_float(cy - 3.0), ctypes.c_float(6.0), ctypes.c_float(6.0))
-        gdiplus.GdipDeleteBrush(pupil)
+        if openness > 0.22:
+            pupil_alpha = int(255 * min(1.0, (openness - 0.22) / 0.45))
+            pupil_color = (pupil_alpha << 24) | 0x00F5C26B
+            pupil_r = 2.6 * openness
+            pupil = ctypes.c_void_p()
+            gdiplus.GdipCreateSolidFill(ctypes.c_uint32(pupil_color), ctypes.byref(pupil))
+            gdiplus.GdipFillEllipse(graphics, pupil, ctypes.c_float(cx - pupil_r), ctypes.c_float(cy - pupil_r), ctypes.c_float(pupil_r * 2), ctypes.c_float(pupil_r * 2))
+            gdiplus.GdipDeleteBrush(pupil)
 
-        # Corneal Glint
-        glint = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFFFFFFFF), ctypes.byref(glint))
-        gdiplus.GdipFillEllipse(graphics, glint, ctypes.c_float(cx + 0.5), ctypes.c_float(cy - 2.5), ctypes.c_float(1.8), ctypes.c_float(1.8))
-        gdiplus.GdipDeleteBrush(glint)
+            if openness > 0.55:
+                glint_alpha = int(235 * min(1.0, (openness - 0.55) / 0.35))
+                glint = ctypes.c_void_p()
+                gdiplus.GdipCreateSolidFill(ctypes.c_uint32((glint_alpha << 24) | 0x00FFFFFF), ctypes.byref(glint))
+                gdiplus.GdipFillEllipse(graphics, glint, ctypes.c_float(cx + 0.4), ctypes.c_float(cy - 1.8 * openness), ctypes.c_float(1.4), ctypes.c_float(1.4))
+                gdiplus.GdipDeleteBrush(glint)
 
-        # Glowing Droplet Indicator on Orb Corner
-        d_halo = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0x552DD4BF), ctypes.byref(d_halo))
-        gdiplus.GdipFillEllipse(graphics, d_halo, ctypes.c_float(dx - 5.0), ctypes.c_float(dy - 5.0), ctypes.c_float(10.0), ctypes.c_float(10.0))
-        gdiplus.GdipDeleteBrush(d_halo)
+        # 3. Optically Centered Studio Typography (UnitPixel + GenericTypographic Ink Alignment)
+        tag_candidates = self._toast_font_candidates("tag")
+        sub_candidates = self._toast_font_candidates("sub")
+        tag_px = 12.0
+        sub_px = 18.5
+        tag_style = 1  # Native Bold face in Linux Biolinum G Bold
+        sub_style = 0  # Native face in Elephant (no synthetic GDI+ bold smearing)
 
-        d_dark = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF0D141C), ctypes.byref(d_dark))
-        gdiplus.GdipFillEllipse(graphics, d_dark, ctypes.c_float(dx - 4.0), ctypes.c_float(dy - 4.0), ctypes.c_float(8.0), ctypes.c_float(8.0))
-        gdiplus.GdipDeleteBrush(d_dark)
-
-        d_core = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(d_core))
-        gdiplus.GdipFillEllipse(graphics, d_core, ctypes.c_float(dx - 2.2), ctypes.c_float(dy - 2.2), ctypes.c_float(4.4), ctypes.c_float(4.4))
-        gdiplus.GdipDeleteBrush(d_core)
-
-        # 3. Typography & Hierarchy
-        ff = ctypes.c_void_p()
-        gdiplus.GdipCreateFontFamilyFromName("Segoe UI", None, ctypes.byref(ff))
-        f_tag = ctypes.c_void_p()
-        gdiplus.GdipCreateFont(ff, ctypes.c_float(8.5), 1, 3, ctypes.byref(f_tag))  # Bold
-        f_sub = ctypes.c_void_p()
-        gdiplus.GdipCreateFont(ff, ctypes.c_float(9.5), 0, 3, ctypes.byref(f_sub))  # Regular
-
-        clean_title = self.toast_title.lstrip("●•-— ").strip() or "TEAR FILM HYDRATION"
+        clean_title = self.toast_title.lstrip("●•-— ").strip() or "EYE HYDRATION"
         clean_sub = self.toast_subtitle.strip()
 
-        # Leading bullet dot for tag
-        tag_dot = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(tag_dot))
-        if is_rtl:
-            gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(w - 56.0), ctypes.c_float(16.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
-        else:
-            gdiplus.GdipFillEllipse(graphics, tag_dot, ctypes.c_float(54.0), ctypes.c_float(16.0), ctypes.c_float(5.0), ctypes.c_float(5.0))
-        gdiplus.GdipDeleteBrush(tag_dot)
+        tl, _tt, _tr, _tw, th = self._measure_text_ink_bounds(tag_candidates, tag_px, tag_style, clean_title)
+        sl, _st, _sr, _sw, sh = self._measure_text_ink_bounds(sub_candidates, sub_px, sub_style, clean_sub)
+        tt = _tt
+        st = _st
+
+        line_gap = 3.5
+        total_ink_h = th + line_gap + sh
+        top_ink_y = cy - (total_ink_h / 2.0)
+        sub_ink_y = top_ink_y + th + line_gap
+
+        ff_tag = self._create_font_family(tag_candidates)
+        ff_sub = self._create_font_family(sub_candidates)
+        f_tag = ctypes.c_void_p()
+        gdiplus.GdipCreateFont(ff_tag, ctypes.c_float(tag_px), tag_style, 2, ctypes.byref(f_tag))  # UnitPixel
+        f_sub = ctypes.c_void_p()
+        gdiplus.GdipCreateFont(ff_sub, ctypes.c_float(sub_px), sub_style, 2, ctypes.byref(f_sub))  # UnitPixel
 
         tag_b = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(tag_b))
+        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xE8F5C26B), ctypes.byref(tag_b))
         sub_b = ctypes.c_void_p()
-        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFFF1F5F9), ctypes.byref(sub_b))
+        gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFFFAF8F5), ctypes.byref(sub_b))
 
-        str_format = ctypes.c_void_p()
-        gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(str_format))
-        flags = 0x00001000 | 0x00004000
-        if is_rtl:
-            flags |= 0x00000001  # DirectionRightToLeft
-            tag_rect = RectF(54.0, 10.0, float(w - 120), 20.0)
-            sub_rect = RectF(54.0, 31.0, float(w - 110), 25.0)
-        else:
-            tag_rect = RectF(64.0, 10.0, float(w - 120), 20.0)
-            sub_rect = RectF(54.0, 31.0, float(w - 110), 25.0)
-        gdiplus.GdipSetStringFormatFlags(str_format, flags)
-        gdiplus.GdipSetStringFormatTrimming(str_format, 3)
+        str_format = self._create_typographic_format()
+        anchor_left = cx + orb_r + 14.0
+        tag_x = anchor_left - tl
+        sub_x = anchor_left - sl
+        tag_rect = RectF(tag_x, top_ink_y - tt, max(40.0, float(w) - 18.0 - tag_x), 32.0)
+        sub_rect = RectF(sub_x, sub_ink_y - st, max(40.0, float(w) - 18.0 - sub_x), 38.0)
 
         gdiplus.GdipDrawString(graphics, clean_title, -1, f_tag, ctypes.byref(tag_rect), str_format, tag_b)
         gdiplus.GdipDrawString(graphics, clean_sub, -1, f_sub, ctypes.byref(sub_rect), str_format, sub_b)
@@ -1002,36 +1307,11 @@ class DesktopOverlayManager:
         gdiplus.GdipDeleteBrush(sub_b)
         gdiplus.GdipDeleteFont(f_tag)
         gdiplus.GdipDeleteFont(f_sub)
-        gdiplus.GdipDeleteFontFamily(ff)
-
-        # 4. Circular Progress Ring & Close Cross
-        if is_rtl:
-            rx, ry = 38.0, float(h / 2)
-            cx_x, cy_x = 18.0, float(h / 2)
-        else:
-            rx, ry = float(w - 38), float(h / 2)
-            cx_x, cy_x = float(w - 18), float(h / 2)
-
-        p_track = ctypes.c_void_p()
-        gdiplus.GdipCreatePen1(ctypes.c_uint32(0x35FFFFFF), ctypes.c_float(1.8), 2, ctypes.byref(p_track))
-        gdiplus.GdipDrawEllipse(graphics, p_track, ctypes.c_float(rx - 7.5), ctypes.c_float(ry - 7.5), ctypes.c_float(15), ctypes.c_float(15))
-        gdiplus.GdipDeletePen(p_track)
-
-        if progress > 0.01:
-            p_prog = ctypes.c_void_p()
-            gdiplus.GdipCreatePen1(ctypes.c_uint32(0xFF2DD4BF), ctypes.c_float(1.8), 2, ctypes.byref(p_prog))
-            sweep = ctypes.c_float(360.0 * progress)
-            gdiplus.GdipDrawArc(graphics, p_prog, ctypes.c_float(rx - 7.5), ctypes.c_float(ry - 7.5), ctypes.c_float(15), ctypes.c_float(15), ctypes.c_float(-90), sweep)
-            gdiplus.GdipDeletePen(p_prog)
-
-        x_p = ctypes.c_void_p()
-        gdiplus.GdipCreatePen1(ctypes.c_uint32(0x8094A3B8), ctypes.c_float(1.6), 2, ctypes.byref(x_p))
-        gdiplus.GdipDrawLine(graphics, x_p, ctypes.c_float(cx_x - 3.5), ctypes.c_float(cy_x - 3.5), ctypes.c_float(cx_x + 3.5), ctypes.c_float(cy_x + 3.5))
-        gdiplus.GdipDrawLine(graphics, x_p, ctypes.c_float(cx_x + 3.5), ctypes.c_float(cy_x - 3.5), ctypes.c_float(cx_x - 3.5), ctypes.c_float(cy_x + 3.5))
-        gdiplus.GdipDeletePen(x_p)
+        gdiplus.GdipDeleteFontFamily(ff_tag)
+        gdiplus.GdipDeleteFontFamily(ff_sub)
 
     def _render_interactive_toast(
-        self, graphics: ctypes.c_void_p, w: int, h: int, progress: float, is_rtl: bool
+        self, graphics: ctypes.c_void_p, w: int, h: int, progress: float
     ) -> None:
         now = time.monotonic()
         rem_sec = max(0, math.ceil(self.toast_expire_ts - now))
@@ -1049,25 +1329,29 @@ class DesktopOverlayManager:
         gdiplus.GdipDeletePen(rim_pen)
         gdiplus.GdipDeletePath(card_path)
 
-        # 2. Setup Fonts
-        ff = ctypes.c_void_p()
-        gdiplus.GdipCreateFontFamilyFromName("Segoe UI", None, ctypes.byref(ff))
-        f_tag = ctypes.c_void_p()
-        gdiplus.GdipCreateFont(ff, ctypes.c_float(8.5), 1, 3, ctypes.byref(f_tag))
-        f_sub = ctypes.c_void_p()
-        gdiplus.GdipCreateFont(ff, ctypes.c_float(9.5), 0, 3, ctypes.byref(f_sub))
-        f_badge = ctypes.c_void_p()
-        gdiplus.GdipCreateFont(ff, ctypes.c_float(10.0), 1, 3, ctypes.byref(f_badge))
-        f_btn = ctypes.c_void_p()
-        gdiplus.GdipCreateFont(ff, ctypes.c_float(8.5), 1, 3, ctypes.byref(f_btn))
+        # 2. Setup DPI-locked Typography (UnitPixel + GenericTypographic Ink Alignment)
+        tag_candidates = self._toast_font_candidates("tag")
+        sub_candidates = self._toast_font_candidates("sub")
+        ui_candidates = self._toast_font_candidates("ui")
+        ff_tag = self._create_font_family(tag_candidates)
+        ff_sub = self._create_font_family(sub_candidates)
+        ff_ui = self._create_font_family(ui_candidates)
 
-        fmt_text = ctypes.c_void_p()
-        gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(fmt_text))
-        t_flags = 0x00001000 | 0x00004000
-        if is_rtl:
-            t_flags |= 0x00000001
-        gdiplus.GdipSetStringFormatFlags(fmt_text, t_flags)
-        gdiplus.GdipSetStringFormatTrimming(fmt_text, 3)
+        tag_px = 11.0
+        sub_px = 14.5
+        badge_px = 15.0
+        btn_px = 12.5
+
+        f_tag = ctypes.c_void_p()
+        gdiplus.GdipCreateFont(ff_tag, ctypes.c_float(tag_px), 1, 2, ctypes.byref(f_tag))
+        f_sub = ctypes.c_void_p()
+        gdiplus.GdipCreateFont(ff_sub, ctypes.c_float(sub_px), 0, 2, ctypes.byref(f_sub))
+        f_badge = ctypes.c_void_p()
+        gdiplus.GdipCreateFont(ff_ui, ctypes.c_float(badge_px), 1, 2, ctypes.byref(f_badge))
+        f_btn = ctypes.c_void_p()
+        gdiplus.GdipCreateFont(ff_ui, ctypes.c_float(btn_px), 1, 2, ctypes.byref(f_btn))
+
+        fmt_text = self._create_typographic_format()
 
         b_teal = ctypes.c_void_p()
         gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF2DD4BF), ctypes.byref(b_teal))
@@ -1076,25 +1360,27 @@ class DesktopOverlayManager:
         b_muted = ctypes.c_void_p()
         gdiplus.GdipCreateSolidFill(ctypes.c_uint32(0xFF94A3B8), ctypes.byref(b_muted))
 
+        clean_title = self.toast_title.lstrip("●•-— ").strip()
+        clean_sub = self.toast_subtitle.strip()
+        tl, tt, _tr, _tw, th = self._measure_text_ink_bounds(tag_candidates, tag_px, 0, clean_title)
+        sl, st, _sr, _sw, sh = self._measure_text_ink_bounds(sub_candidates, sub_px, 0, clean_sub)
+
         cy = float(h / 2.0)
-        if is_rtl:
-            cx_badge = float(w - 34.0)
-            btn_postpone_rect = (122.0, 18.0, 100.0, 30.0)
-            btn_skip_rect = (48.0, 18.0, 64.0, 30.0)
-            cx_close = 24.0
-            text_tag_rect = RectF(234.0, 13.0, float(w - 234.0 - 58.0), 18.0)
-            text_sub_rect = RectF(234.0, 33.0, float(w - 234.0 - 58.0), 22.0)
-            postpone_label = f"تأجيل {self.toast_postpone_mins} د"
-            skip_label = "تخطي"
-        else:
-            cx_badge = 34.0
-            btn_postpone_rect = (296.0, 18.0, 114.0, 30.0)
-            btn_skip_rect = (418.0, 18.0, 64.0, 30.0)
-            cx_close = float(w - 22.0)
-            text_tag_rect = RectF(58.0, 13.0, 230.0, 18.0)
-            text_sub_rect = RectF(58.0, 33.0, 230.0, 22.0)
-            postpone_label = f"Postpone ({self.toast_postpone_mins}m)"
-            skip_label = "Skip"
+        line_gap = 4.0
+        top_ink_y = cy - (th + line_gap + sh) / 2.0
+        sub_ink_y = top_ink_y + th + line_gap
+
+        cx_badge = 34.0
+        btn_postpone_rect = (296.0, 18.0, 114.0, 30.0)
+        btn_skip_rect = (418.0, 18.0, 64.0, 30.0)
+        cx_close = float(w - 22.0)
+        anchor_left = 58.0
+        tag_x = anchor_left - tl
+        sub_x = anchor_left - sl
+        text_tag_rect = RectF(tag_x, top_ink_y - tt, max(80.0, 288.0 - tag_x), 26.0)
+        text_sub_rect = RectF(sub_x, sub_ink_y - st, max(80.0, 288.0 - sub_x), 30.0)
+        postpone_label = f"Postpone ({self.toast_postpone_mins}m)"
+        skip_label = "Skip"
 
         # 3. Circular Countdown Badge
         badge_r = 17.0
@@ -1116,18 +1402,12 @@ class DesktopOverlayManager:
             gdiplus.GdipDeletePen(p_prog)
 
         badge_str = str(rem_sec)
-        badge_rect = RectF(cx_badge - badge_r, cy - 9.0, badge_r * 2, 18.0)
-        fmt_b = ctypes.c_void_p()
-        gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(fmt_b))
-        gdiplus.GdipSetStringFormatFlags(fmt_b, 0x00001000 | 0x00004000)
-        ctypes.windll.gdiplus.GdipSetStringFormatAlign(fmt_b, 1)
-        ctypes.windll.gdiplus.GdipSetStringFormatLineAlign(fmt_b, 1)
+        badge_rect = RectF(cx_badge - badge_r, cy - badge_r, badge_r * 2, badge_r * 2)
+        fmt_b = self._create_typographic_format(align=1, line_align=1)
         gdiplus.GdipDrawString(graphics, badge_str, -1, f_badge, ctypes.byref(badge_rect), fmt_b, b_teal)
         gdiplus.GdipDeleteStringFormat(fmt_b)
 
         # 4. Texts
-        clean_title = self.toast_title.lstrip("●•-— ").strip()
-        clean_sub = self.toast_subtitle.strip()
         gdiplus.GdipDrawString(graphics, clean_title, -1, f_tag, ctypes.byref(text_tag_rect), fmt_text, b_teal)
         gdiplus.GdipDrawString(graphics, clean_sub, -1, f_sub, ctypes.byref(text_sub_rect), fmt_text, b_white)
 
@@ -1148,12 +1428,8 @@ class DesktopOverlayManager:
             gdiplus.GdipDeletePen(p_pen)
             gdiplus.GdipDeletePath(p_path)
 
-            p_btn_rect = RectF(px, py + 1.0, pw, ph - 2.0)
-            fmt_pbtn = ctypes.c_void_p()
-            gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(fmt_pbtn))
-            ctypes.windll.gdiplus.GdipSetStringFormatAlign(fmt_pbtn, 1)
-            ctypes.windll.gdiplus.GdipSetStringFormatLineAlign(fmt_pbtn, 1)
-            gdiplus.GdipSetStringFormatFlags(fmt_pbtn, 0x00001000 | 0x00004000)
+            p_btn_rect = RectF(px, py, pw, ph)
+            fmt_pbtn = self._create_typographic_format(align=1, line_align=1)
             gdiplus.GdipDrawString(graphics, postpone_label, -1, f_btn, ctypes.byref(p_btn_rect), fmt_pbtn, b_white if is_post_hover else b_teal)
             gdiplus.GdipDeleteStringFormat(fmt_pbtn)
 
@@ -1173,12 +1449,8 @@ class DesktopOverlayManager:
         gdiplus.GdipDeletePen(s_pen)
         gdiplus.GdipDeletePath(s_path)
 
-        s_btn_rect = RectF(sx, sy + 1.0, sw, sh - 2.0)
-        fmt_sbtn = ctypes.c_void_p()
-        gdiplus.GdipCreateStringFormat(0, 0, ctypes.byref(fmt_sbtn))
-        ctypes.windll.gdiplus.GdipSetStringFormatAlign(fmt_sbtn, 1)
-        ctypes.windll.gdiplus.GdipSetStringFormatLineAlign(fmt_sbtn, 1)
-        gdiplus.GdipSetStringFormatFlags(fmt_sbtn, 0x00001000 | 0x00004000)
+        s_btn_rect = RectF(sx, sy, sw, sh)
+        fmt_sbtn = self._create_typographic_format(align=1, line_align=1)
         gdiplus.GdipDrawString(graphics, skip_label, -1, f_btn, ctypes.byref(s_btn_rect), fmt_sbtn, b_white if is_skip_hover else b_muted)
         gdiplus.GdipDeleteStringFormat(fmt_sbtn)
 
@@ -1200,7 +1472,9 @@ class DesktopOverlayManager:
         gdiplus.GdipDeleteFont(f_sub)
         gdiplus.GdipDeleteFont(f_badge)
         gdiplus.GdipDeleteFont(f_btn)
-        gdiplus.GdipDeleteFontFamily(ff)
+        gdiplus.GdipDeleteFontFamily(ff_tag)
+        gdiplus.GdipDeleteFontFamily(ff_sub)
+        gdiplus.GdipDeleteFontFamily(ff_ui)
 
     def _paint_toolbar_window(self, hwnd: int) -> None:
         ps = PAINTSTRUCT()
@@ -1224,7 +1498,7 @@ class DesktopOverlayManager:
 
             gdi32.SetBkMode(hdc, TRANSPARENT)
             gdi32.SetTextColor(hdc, 0x00FFFFFF)
-            hfont = gdi32.CreateFontW(-12, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Segoe UI")
+            hfont = gdi32.CreateFontW(-12, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 4, 0, "Linux Biolinum G")
             old = gdi32.SelectObject(hdc, hfont)
 
             labels = ["🌙 Dark", "◑ Gray", "🔅 Dim", "📌 Pin"]
@@ -1431,7 +1705,8 @@ class DesktopOverlayManager:
                 if ex & WS_EX_TRANSPARENT:
                     user32.SetWindowLongW(self.hwnd_toast, -20, ex & ~WS_EX_TRANSPARENT)
             else:
-                w, h = 430, 60
+                sub_len = len((self.toast_subtitle or "").strip())
+                w, h = (480, 76) if sub_len > 28 else (296, 68)
                 # Restore WS_EX_TRANSPARENT for passive click-through blink reminders
                 ex = user32.GetWindowLongW(self.hwnd_toast, -20)
                 if not (ex & WS_EX_TRANSPARENT):

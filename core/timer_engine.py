@@ -253,8 +253,6 @@ class BreakTimerEngine:
                 self._pre_prompt_fired = False
                 self._pre_prompt_10s_fired = False
                 self._pre_blink_prompt_fired = False
-                if self.on_break_end:
-                    callbacks.append(self.on_break_end)
 
         for cb in callbacks:
             try:
@@ -315,6 +313,11 @@ class BreakTimerEngine:
         with self._lock:
             if not self.allow_delay_timer or self.delays_used >= self.max_delay_times:
                 return False
+            was_in_break = self.state in (
+                TimerState.BLINK_20_20,
+                TimerState.SHORT_BREAK,
+                TimerState.LONG_BREAK,
+            )
             self.delays_used += 1
             self._pre_prompt_fired = False
             self._pre_prompt_10s_fired = False
@@ -322,7 +325,7 @@ class BreakTimerEngine:
             self.state = TimerState.WORKING
             self.work_remaining_sec = max(self.work_remaining_sec, minutes * 60)
             self.blink_counter_sec = max(self.blink_counter_sec, minutes * 60)
-            if self.on_break_end:
+            if was_in_break and self.on_break_end:
                 callbacks.append(self.on_break_end)
 
         for cb in callbacks:
@@ -433,6 +436,11 @@ class BreakTimerEngine:
             "state_enum": self.state,
             "remaining_seconds": rem,
             "work_duration": self.work_duration,
+            "work_minutes": max(1, int(round(self.work_duration / 60))),
+            "short_break_seconds": int(self.short_break_duration),
+            "long_break_minutes": max(1, int(round(self.long_break_duration / 60))),
+            "enable_20_20": bool(self.enable_20_20),
+            "enable_idle": bool(self.auto_pause),
             "work_remaining_sec": self.work_remaining_sec,
             "break_remaining_sec": self.break_remaining_sec,
             "blink_counter_sec": self.blink_counter_sec,

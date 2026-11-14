@@ -1,4 +1,5 @@
 from typing import Optional, Dict, Any, List, Tuple
+import json
 import os
 import sys
 
@@ -176,7 +177,7 @@ def force_foreground_window(hwnd: int):
 
 
 class EyeGuardApp:
-    VERSION = "3.1.0"
+    VERSION = "4.0.0"
 
     def __init__(self):
         # 1. Config & Dynamic LocalAppData Storage
@@ -327,10 +328,16 @@ class EyeGuardApp:
 
         # 4. Timer Engine
         tm_cfg = self.config_mgr.get("timer", default={}) or {}
+        saved_short_sec = tm_cfg.get("short_break_seconds", None)
+        short_break_sec = (
+            max(5, int(saved_short_sec))
+            if saved_short_sec is not None
+            else max(5, int(tm_cfg.get("short_break_minutes", 5)) * 60)
+        )
         self.timer_engine = BreakTimerEngine(
-            work_duration_sec=int(tm_cfg.get("work_minutes", 45)) * 60,
-            short_break_sec=int(tm_cfg.get("short_break_minutes", 5)) * 60,
-            long_break_sec=int(tm_cfg.get("long_break_minutes", 15)) * 60,
+            work_duration_sec=max(1, int(tm_cfg.get("work_minutes", 45))) * 60,
+            short_break_sec=short_break_sec,
+            long_break_sec=max(1, int(tm_cfg.get("long_break_minutes", 15))) * 60,
             cycles_before_long=int(tm_cfg.get("long_break_interval", 0)),
             enable_20_20=bool(tm_cfg.get("enable_20_20_rule", True)),
             enable_pomodoro=bool(tm_cfg.get("enable_pomodoro", True)),
@@ -351,6 +358,7 @@ class EyeGuardApp:
         )
         self._latest_timer_status = {}
         self._active_break = None
+        self._in_break_kiosk_mode = False
         self._was_hidden_before_break = False
         self._is_window_hidden = False
         self._prev_foreground_hwnd = None
@@ -466,14 +474,14 @@ class EyeGuardApp:
 
             # If window is excessively large (greater than work area or >= 95% of screen height)
             if curr_w > work_w or curr_h > work_h or (curr_h >= int(mon_h * 0.95)):
-                target_w = min(840, max(740, int(work_w * 0.85)))
-                target_h = min(580, max(500, int(work_h * 0.88)))
+                target_w = min(920, max(460, int(work_w * 0.85)))
+                target_h = min(640, max(360, int(work_h * 0.88)))
                 target_x = mi.rcWork.left + (work_w - target_w) // 2
                 target_y = mi.rcWork.top + (work_h - target_h) // 2
                 needs_reposition = True
             else:
                 if target_h > work_h:
-                    target_h = min(580, int(work_h * 0.88))
+                    target_h = min(640, max(360, int(work_h * 0.88)))
                     needs_reposition = True
                 if target_y + target_h > mi.rcWork.bottom:
                     target_y = mi.rcWork.bottom - target_h
@@ -569,16 +577,75 @@ class EyeGuardApp:
             pass
         return (50.0, 50.0)
 
+    def _push_break_state_to_webview(
+        self, active_break: Optional[dict] = None, wait_ms: float = 120.0
+    ) -> None:
+        win = self._window
+        if not win or not hasattr(win, "evaluate_js") or _is_running_unit_tests():
+            return
+        if active_break:
+            payload = json.dumps(active_break, ensure_ascii=False)
+            script = (
+                "(function(brk){"
+                "if(typeof window.onBreakTrigger==='function'){"
+                "window.onBreakTrigger(brk.type,brk.duration,brk.mode,brk);"
+                "void document.body.offsetHeight;"
+                "}"
+                f"}})({payload});"
+            )
+        else:
+            script = (
+                "(function(){"
+                "if(typeof window.onBreakEnd==='function'){window.onBreakEnd();}"
+                "})();"
+            )
+
+        done = threading.Event()
+
+        def _run():
+            try:
+                win.evaluate_js(script)
+            except Exception:
+                pass
+            finally:
+                done.set()
+
+        threading.Thread(target=_run, daemon=True).start()
+        if wait_ms > 0:
+            done.wait(timeout=wait_ms / 1000.0)
+
+    def _get_normal_window_rect(self, hwnd: int) -> Tuple[int, int, int, int]:
+        if user32.IsIconic(hwnd):
+            class WINDOWPLACEMENT(ctypes.Structure):
+                _fields_ = [
+                    ("length", wintypes.UINT),
+                    ("flags", wintypes.UINT),
+                    ("showCmd", wintypes.UINT),
+                    ("ptMinPosition", wintypes.POINT),
+                    ("ptMaxPosition", wintypes.POINT),
+                    ("rcNormalPosition", wintypes.RECT),
+                ]
+
+            wp = WINDOWPLACEMENT()
+            wp.length = ctypes.sizeof(WINDOWPLACEMENT)
+            if user32.GetWindowPlacement(hwnd, ctypes.byref(wp)):
+                nr = wp.rcNormalPosition
+                w = max(740, nr.right - nr.left)
+                h = max(500, nr.bottom - nr.top)
+                return (nr.left, nr.top, w, h)
+        rc = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rc))
+        return (rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top)
+
     def _enter_fullscreen_kiosk_mode(self, transparency_pct: int = 100, mode: str = "fullscreen"):
         hwnd = self._get_main_hwnd()
         if not hwnd:
             return
         try:
-            rc = wintypes.RECT()
-            user32.GetWindowRect(hwnd, ctypes.byref(rc))
-            self._saved_win_rect = (rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top)
-            self._saved_win_style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
-            self._saved_win_ex_style = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
+            if not getattr(self, "_in_break_kiosk_mode", False):
+                self._saved_win_rect = self._get_normal_window_rect(hwnd)
+                self._saved_win_style = user32.GetWindowLongW(hwnd, -16)  # GWL_STYLE
+                self._saved_win_ex_style = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
 
             # Multi-monitor bounds strictly for break fullscreen
             vx = user32.GetSystemMetrics(76)  # SM_XVIRTUALSCREEN
@@ -604,19 +671,53 @@ class EyeGuardApp:
                 target_x, target_y = vx, vy
                 target_w, target_h = vw, vh
 
+            was_visible = bool(user32.IsWindowVisible(hwnd))
+            was_iconic = bool(user32.IsIconic(hwnd))
+
+            # Switch to borderless WS_POPUP and apply break geometry while hidden (prevents dashboard flash)
+            if not was_visible or was_iconic:
+                user32.SetWindowLongW(hwnd, -16, 0x80000000)  # WS_POPUP (hidden)
+                user32.SetWindowPos(
+                    hwnd,
+                    ctypes.c_void_p(-1),  # HWND_TOPMOST
+                    target_x, target_y, target_w, target_h,
+                    0x0020 | 0x0010,  # SWP_FRAMECHANGED | SWP_NOACTIVATE
+                )
+                if was_iconic:
+                    user32.ShowWindow(hwnd, 4)  # SW_SHOWNOACTIVATE clears minimized state cleanly
+
             # WS_POPUP | WS_VISIBLE = 0x90000000
             user32.SetWindowLongW(hwnd, -16, 0x90000000)
             user32.SetWindowPos(
                 hwnd,
                 ctypes.c_void_p(-1),  # HWND_TOPMOST
                 target_x, target_y, target_w, target_h,
-                0x0020 | 0x0040  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
+                0x0020 | 0x0040,  # SWP_FRAMECHANGED | SWP_SHOWWINDOW
             )
+            if not was_visible and self._window:
+                try:
+                    self._window.show()
+                except Exception:
+                    pass
+                user32.SetWindowLongW(hwnd, -16, 0x90000000)
+                user32.SetWindowPos(
+                    hwnd,
+                    ctypes.c_void_p(-1),
+                    target_x, target_y, target_w, target_h,
+                    0x0020 | 0x0040,
+                )
+
+            self._is_window_hidden = False
+            self._in_break_kiosk_mode = True
             force_foreground_window(hwnd)
         except Exception:
             pass
 
     def _exit_fullscreen_kiosk_mode(self, is_preview: bool = False):
+        if not getattr(self, "_in_break_kiosk_mode", False) and not self._saved_win_rect:
+            return
+        self._in_break_kiosk_mode = False
+        self._push_break_state_to_webview(None, wait_ms=0.0)
         hwnd = self._get_main_hwnd()
         was_hidden = getattr(self, "_was_hidden_before_break", True)
         is_preview = is_preview or getattr(self, "_was_break_preview", False)
@@ -638,8 +739,8 @@ class EyeGuardApp:
                         ctypes.c_void_p(-2),  # HWND_NOTOPMOST
                         x,
                         y,
-                        max(700, w),
-                        max(480, h),
+                        max(460, w),
+                        max(360, h),
                         0x0040 | 0x0020,  # SWP_SHOWWINDOW | SWP_FRAMECHANGED
                     )
                 else:
@@ -649,8 +750,8 @@ class EyeGuardApp:
                         ctypes.c_void_p(-2),  # HWND_NOTOPMOST
                         x,
                         y,
-                        max(700, w),
-                        max(480, h),
+                        max(460, w),
+                        max(360, h),
                         0x0080 | 0x0020,  # SWP_HIDEWINDOW | SWP_FRAMECHANGED
                     )
             self._saved_win_rect = None
@@ -729,29 +830,17 @@ class EyeGuardApp:
         delays_used = getattr(self.timer_engine, "delays_used", 0)
         can_postpone = allow_delay and (delays_used < max_delays)
 
-        lang = str(self.config_mgr.get("general", "language", default="en"))
         b_str = str(break_type or "short_break")
         rem = max(1, int(remaining_sec))
-        if lang == "ar":
-            if b_str == "blink_20_20":
-                title = "استراحة 20-20-20 للعينين"
-                sub = f"تبدأ خلال {rem} ثوانٍ • احفظ عملك"
-            elif b_str == "long_break":
-                title = "استراحة استرخاء طويلة"
-                sub = f"تبدأ خلال {rem} ثوانٍ • احفظ عملك"
-            else:
-                title = "استراحة قصيرة للعينين"
-                sub = f"تبدأ خلال {rem} ثوانٍ • احفظ عملك"
+        if b_str == "blink_20_20":
+            title = "20-20-20 MICRO BREAK"
+            sub = f"Starting in {rem}s — save your work"
+        elif b_str == "long_break":
+            title = "LONG REST BREAK"
+            sub = f"Starting in {rem}s — save your work"
         else:
-            if b_str == "blink_20_20":
-                title = "20-20-20 MICRO BREAK"
-                sub = f"Starting in {rem}s — save your work"
-            elif b_str == "long_break":
-                title = "LONG REST BREAK"
-                sub = f"Starting in {rem}s — save your work"
-            else:
-                title = "SHORT EYE BREAK"
-                sub = f"Starting in {rem}s — save your work"
+            title = "SHORT EYE BREAK"
+            sub = f"Starting in {rem}s — save your work"
         self.desktop_overlays.show_toast(
             title=title,
             subtitle=sub,
@@ -766,22 +855,15 @@ class EyeGuardApp:
         try:
             tm = self.config_mgr.get("timer", default={}) or {}
             pos = str(tm.get("reminder_popup_pos", "top_center"))
-            lang = str(self.config_mgr.get("general", "language", default="en"))
-            if lang == "ar":
-                tag = "ترطيب القرنية وتجديد الدموع"
-                msg = "ارمش مرتين بلطف"
-            else:
-                tag = "TEAR FILM HYDRATION"
-                msg = "Blink gently twice"
             self.desktop_overlays.show_toast(
-                title=tag,
-                subtitle=msg,
+                title="EYE HYDRATION",
+                subtitle="Blink gently twice",
                 position=pos,
                 duration_sec=4.0,
             )
         except Exception:
             self.desktop_overlays.show_toast(
-                title="TEAR FILM HYDRATION",
+                title="EYE HYDRATION",
                 subtitle="Blink gently twice",
                 position="top_center",
                 duration_sec=4.0,
@@ -1289,19 +1371,13 @@ class EyeGuardApp:
                 self._prev_foreground_hwnd = None
 
             self._was_hidden_before_break = self._is_window_hidden
-            self.show_window()
-            main_h = self._get_main_hwnd()
-            if main_h:
-                force_foreground_window(main_h)
             brk_mode = self.timer_engine.break_mode
             if not _is_running_unit_tests():
-                threading.Timer(
-                    0.05,
-                    lambda: self._enter_fullscreen_kiosk_mode(
-                        int(tm_cfg.get("lock_screen_transparency", 100)),
-                        mode=brk_mode,
-                    ),
-                ).start()
+                self._push_break_state_to_webview(self._active_break, wait_ms=120.0)
+                self._enter_fullscreen_kiosk_mode(
+                    int(tm_cfg.get("lock_screen_transparency", 100)),
+                    mode=brk_mode,
+                )
 
     def _on_break_end(self):
         last_break = self._active_break
@@ -1346,7 +1422,6 @@ class EyeGuardApp:
             pass
 
     def trigger_break(self):
-        self.show_window()
         self.take_break_now("short_break")
 
     def preview_break_mode(self):
@@ -1373,16 +1448,19 @@ class EyeGuardApp:
             saved_pwd = str(tm_cfg.get("break_password", "")).strip()
             if saved_pwd and str(password_attempt or "").strip() != saved_pwd:
                 return {"ok": False, "error": "invalid_password", "reason": "invalid_password"}
+        had_active_break = bool(self._active_break) or getattr(self, "_in_break_kiosk_mode", False)
         is_prev = bool(self._active_break and self._active_break.get("is_preview")) or getattr(self, "_was_break_preview", False)
         self._active_break = None
         self.timer_engine.skip_break()
-        self._exit_fullscreen_kiosk_mode(is_preview=is_prev)
+        if had_active_break:
+            self._exit_fullscreen_kiosk_mode(is_preview=is_prev)
         return {"ok": True}
 
     def postpone_break(self, minutes: int = 5) -> dict:
+        had_active_break = bool(self._active_break) or getattr(self, "_in_break_kiosk_mode", False)
         is_prev = bool(self._active_break and self._active_break.get("is_preview")) or getattr(self, "_was_break_preview", False)
         ok = self.timer_engine.postpone_break(int(minutes))
-        if ok:
+        if ok and had_active_break:
             self._active_break = None
             self._exit_fullscreen_kiosk_mode(is_preview=is_prev)
         return {
@@ -1404,20 +1482,28 @@ class EyeGuardApp:
         enable_20_20: bool = True,
         enable_pomodoro: bool = True,
         long_cycles: int = None,
+        long_break_min: int = None,
     ):
+        work_m = max(1, min(360, int(work_min)))
+        rest_s = max(5, min(7200, int(break_sec)))
         kwargs = {
-            "work_duration_sec": int(work_min) * 60,
-            "short_break_sec": int(break_sec),
+            "work_duration_sec": work_m * 60,
+            "short_break_sec": rest_s,
             "enable_20_20": bool(enable_20_20),
             "enable_pomodoro": bool(enable_pomodoro),
         }
         if long_cycles is not None:
-            kwargs["cycles_before_long"] = int(long_cycles)
-            self.config_mgr.set("timer", "long_break_interval", int(long_cycles))
+            kwargs["cycles_before_long"] = max(0, int(long_cycles))
+            self.config_mgr.set("timer", "long_break_interval", max(0, int(long_cycles)))
+        if long_break_min is not None:
+            long_m = max(1, min(180, int(long_break_min)))
+            kwargs["long_break_sec"] = long_m * 60
+            self.config_mgr.set("timer", "long_break_minutes", long_m)
 
         self.timer_engine.configure(**kwargs)
-        self.config_mgr.set("timer", "work_minutes", int(work_min))
-        self.config_mgr.set("timer", "short_break_minutes", max(1, int(break_sec) // 60))
+        self.config_mgr.set("timer", "work_minutes", work_m)
+        self.config_mgr.set("timer", "short_break_seconds", rest_s)
+        self.config_mgr.set("timer", "short_break_minutes", max(1, round(rest_s / 60)))
         self.config_mgr.set("timer", "enable_20_20_rule", bool(enable_20_20))
         self.config_mgr.set("timer", "enable_pomodoro", bool(enable_pomodoro))
         return self.get_timer_status()
@@ -1756,6 +1842,9 @@ class EyeGuardApp:
             "cycle_count": st_data["cycle_count"],
             "is_paused": st_data["is_paused"],
             "work_duration": st_data.get("work_duration", 2700),
+            "work_duration_seconds": st_data.get("work_duration", 2700),
+            "work_minutes": st_data.get("work_minutes", 45),
+            "short_break_seconds": st_data.get("short_break_seconds", 300),
             "work_remaining_sec": st_data["work_remaining_sec"],
             "break_remaining_sec": st_data["break_remaining_sec"],
             "blink_remaining_sec": st_data["blink_remaining_sec"],
@@ -1856,6 +1945,8 @@ class EyeGuardApp:
             if v is not None:
                 if k == "launch_on_startup":
                     self.set_windows_startup(bool(v))
+                elif k == "language":
+                    self.config_mgr.set("general", "language", "en")
                 else:
                     self.config_mgr.set("general", k, v)
                     if k == "auto_meeting_bypass" and hasattr(self, "system_events"):
@@ -2344,9 +2435,15 @@ class JSBridgeApi:
         enable_20_20=True,
         enable_pomodoro=True,
         long_cycles=None,
+        long_break_min=None,
     ):
         return self._app.configure_timer(
-            work_min, break_sec, enable_20_20, enable_pomodoro, long_cycles
+            work_min,
+            break_sec,
+            enable_20_20,
+            enable_pomodoro,
+            long_cycles,
+            long_break_min,
         )
 
     def update_timer_config(self, e20, idle, sound=None, dnd=None, idle_sec=None):
@@ -2527,10 +2624,10 @@ def run_app():
     # Determine initial window size based on screen workarea
     work_rc = wintypes.RECT()
     user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(work_rc), 0)  # SPI_GETWORKAREA
-    avail_w = max(800, work_rc.right - work_rc.left)
-    avail_h = max(560, work_rc.bottom - work_rc.top)
-    init_w = min(840, max(740, int(avail_w * 0.85)))
-    init_h = min(580, max(500, int(avail_h * 0.88)))
+    avail_w = max(560, work_rc.right - work_rc.left)
+    avail_h = max(420, work_rc.bottom - work_rc.top)
+    init_w = min(840, max(540, int(avail_w * 0.85)))
+    init_h = min(580, max(420, int(avail_h * 0.88)))
 
     app._window = webview.create_window(
         title="EyeGuard",
@@ -2538,7 +2635,7 @@ def run_app():
         js_api=api,
         width=init_w,
         height=init_h,
-        min_size=(740, 500),
+        min_size=(460, 360),
         background_color="#181b20",
     )
 

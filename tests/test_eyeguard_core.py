@@ -638,5 +638,248 @@ class TestConfigCircadianAndBindings(unittest.TestCase):
                 self.assertFalse(real_cm.get("screen", "deep_crimson"))
 
 
+class TestBreakAndToastWindowBehavior(unittest.TestCase):
+    def _build_mocked_app(self, tmpdir):
+        import app as app_mod
+
+        real_cm = cfg_mod.ConfigManager(config_dir=tmpdir)
+        real_cm.set("timer", "enabled", True)
+        real_cm.set("timer", "allow_delay_timer", True)
+        real_cm.set("timer", "max_delay_times", 3)
+        real_cm.set("timer", "break_mode", "fullscreen")
+
+        with patch.object(app_mod, "ConfigManager", return_value=real_cm), \
+             patch.object(app_mod, "EyeGuardGammaEngine") as MockGamma, \
+             patch.object(app_mod, "DesktopOverlayManager"), \
+             patch.object(app_mod, "Win32FocusRuler"), \
+             patch.object(app_mod, "MagicWindowEngine"), \
+             patch.object(app_mod, "HotkeyEngine"), \
+             patch.object(app_mod, "TrayManager"), \
+             patch("core.system_events.SystemEventsMonitor"):
+            mock_eng = MockGamma.return_value
+            mock_eng.get_monitors.return_value = []
+            mock_eng.get_hardware_brightness.return_value = 80
+            mock_eng.get_active_backend.return_value = "hardware_lut"
+            eg = app_mod.EyeGuardApp()
+            self.addCleanup(eg.hard_exit)
+            return eg, app_mod
+
+    def test_pre_break_toast_postpone_and_skip_do_not_open_main_window(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            eg, _ = self._build_mocked_app(tmpdir)
+            eg.timer_engine.stop()
+            eg._is_window_hidden = True
+            eg._was_hidden_before_break = False
+
+            break_end_calls = []
+            orig_on_break_end = eg._on_break_end
+            eg._on_break_end = lambda: (break_end_calls.append(True), orig_on_break_end())
+            eg.timer_engine.on_break_end = eg._on_break_end
+
+            with patch.object(eg, "show_window") as mock_show, \
+                 patch.object(eg, "_exit_fullscreen_kiosk_mode") as mock_exit_kiosk:
+                eg._on_toast_postpone(5)
+                mock_show.assert_not_called()
+                mock_exit_kiosk.assert_not_called()
+                self.assertEqual(break_end_calls, [])
+                self.assertTrue(eg._is_window_hidden)
+                self.assertEqual(eg.timer_engine.delays_used, 1)
+
+                eg._on_toast_skip()
+                mock_show.assert_not_called()
+                mock_exit_kiosk.assert_not_called()
+                self.assertEqual(break_end_calls, [])
+                self.assertTrue(eg._is_window_hidden)
+
+    def test_active_break_postpone_stays_hidden_without_double_exit_reopening(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            eg, _ = self._build_mocked_app(tmpdir)
+            eg.timer_engine.stop()
+            eg._is_window_hidden = True
+            eg._was_hidden_before_break = True
+            eg._in_break_kiosk_mode = True
+            eg._saved_win_rect = (100, 100, 820, 560)
+            eg._saved_win_style = 0x10CF0000
+            eg._active_break = {"type": "short_break", "duration": 180, "mode": "fullscreen", "id": 1}
+            from core.timer_engine import TimerState
+            eg.timer_engine.state = TimerState.SHORT_BREAK
+
+            with patch.object(eg, "_get_main_hwnd", return_value=0), \
+                 patch.object(eg, "show_window") as mock_show, \
+                 patch.object(eg, "hide_window") as mock_hide:
+                res = eg.postpone_break(5)
+                self.assertTrue(res["ok"])
+                mock_show.assert_not_called()
+                mock_hide.assert_called_once()
+                self.assertFalse(eg._in_break_kiosk_mode)
+
+    def test_break_trigger_pushes_webview_and_enters_kiosk_without_dashboard_flash(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            eg, app_mod = self._build_mocked_app(tmpdir)
+            eg.timer_engine.stop()
+            eg._is_window_hidden = True
+
+            events = []
+            with patch.object(app_mod, "_is_running_unit_tests", return_value=False), \
+                 patch.object(eg, "show_window") as mock_show, \
+                 patch.object(eg, "_push_break_state_to_webview", side_effect=lambda *a, **kw: events.append("push")), \
+                 patch.object(eg, "_enter_fullscreen_kiosk_mode", side_effect=lambda *a, **kw: events.append("kiosk")):
+                from core.timer_engine import TimerState
+                eg.trigger_break()
+                if not events:
+                    eg._on_break_trigger(TimerState.SHORT_BREAK, 180)
+                mock_show.assert_not_called()
+                self.assertEqual(events[:2], ["push", "kiosk"])
+                self.assertTrue(eg._was_hidden_before_break)
+
+    def test_blink_openness_curve_and_passive_toast_sizing(self):
+        from core.desktop_overlays import DesktopOverlayManager
+        import core.desktop_overlays as overlays_mod
+
+        # Open outside blink windows, gently closed (~0.0) at both blink peaks
+        self.assertEqual(DesktopOverlayManager._blink_openness(0.20), 1.0)
+        self.assertLess(DesktopOverlayManager._blink_openness(0.99), 0.01)
+        self.assertEqual(DesktopOverlayManager._blink_openness(1.50), 1.0)
+        self.assertLess(DesktopOverlayManager._blink_openness(2.09), 0.01)
+
+        mgr = DesktopOverlayManager.__new__(DesktopOverlayManager)
+        mgr.hwnd_toast = 1
+        mgr.toast_is_prompt = False
+        mgr.toast_position = "top_center"
+        mgr.toast_x = 0
+        mgr.toast_y = 0
+        mgr.toast_w = 0
+        mgr.toast_h = 0
+
+        wa = type("WA", (), {"left": 0, "top": 0, "right": 1920, "bottom": 1080})()
+        with patch.object(mgr, "_get_work_area", return_value=wa), \
+             patch.object(mgr, "_render_and_update_toast"), \
+             patch.object(overlays_mod.user32, "GetWindowLongW", return_value=0), \
+             patch.object(overlays_mod.user32, "SetWindowLongW"):
+            mgr.toast_subtitle = "Blink gently twice"
+            mgr._handle_cmd(("show_toast",))
+            self.assertEqual((mgr.toast_w, mgr.toast_h), (296, 68))
+
+            mgr.toast_subtitle = "Relax with a slow blink"
+            mgr._handle_cmd(("show_toast",))
+            self.assertEqual((mgr.toast_w, mgr.toast_h), (296, 68))
+
+            mgr.toast_subtitle = "A short break begins in 15 seconds — prepare to rest."
+            mgr._handle_cmd(("show_toast",))
+            self.assertEqual((mgr.toast_w, mgr.toast_h), (480, 76))
+
+    def test_toast_typographic_font_candidates_and_ink_centering(self):
+        import ctypes
+        import os
+        from core.desktop_overlays import DesktopOverlayManager, gdiplus
+
+        font_paths = DesktopOverlayManager._resolve_bundled_font_paths()
+        basenames = {os.path.basename(p) for p in font_paths}
+        self.assertIn("LinBiolinum_RB_G.ttf", basenames)
+        self.assertIn("thmanyahseriftext-Black.otf", basenames)
+
+        self.assertEqual(DesktopOverlayManager._toast_font_candidates("tag")[0], "Linux Biolinum G")
+        self.assertEqual(DesktopOverlayManager._toast_font_candidates("sub")[0], "thmanyah serif text Black")
+        self.assertEqual(DesktopOverlayManager._toast_font_candidates("ui")[0], "Linux Biolinum G")
+
+        mgr = DesktopOverlayManager()
+        try:
+            self.assertTrue(bool(mgr._private_font_collection.value))
+
+            gdiplus.GdipGetFamilyName.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_ushort]
+            for role, expected_fam in (
+                ("tag", "Linux Biolinum G"),
+                ("sub", "thmanyah serif text Black"),
+                ("ui", "Linux Biolinum G"),
+            ):
+                ff = mgr._create_font_family(mgr._toast_font_candidates(role))
+                self.assertTrue(bool(ff.value))
+                name_buf = ctypes.create_unicode_buffer(64)
+                gdiplus.GdipGetFamilyName(ff, name_buf, 0)
+                gdiplus.GdipDeleteFontFamily(ff)
+                self.assertEqual(name_buf.value, expected_fam)
+
+            tl, tt, tr, tw, th = mgr._measure_text_ink_bounds(
+                mgr._toast_font_candidates("tag"), 12.0, 1, "EYE HYDRATION"
+            )
+            sl, st, sr, sw, sh = mgr._measure_text_ink_bounds(
+                mgr._toast_font_candidates("sub"), 18.5, 0, "Blink gently twice"
+            )
+            self.assertGreater(tw, 40.0)
+            self.assertGreater(sw, 100.0)
+            total_h = th + 3.5 + sh
+            cy = 68.0 / 2.0
+            top_ink_y = cy - total_h / 2.0
+            bot_ink_y = top_ink_y + total_h
+            # Ensure generous symmetric clearance (>= 10px) from pill outer edges inside 68px capsule
+            self.assertGreater(top_ink_y, 10.0)
+            self.assertLess(bot_ink_y, 58.0)
+            self.assertAlmostEqual(top_ink_y - 0.0, 68.0 - bot_ink_y, places=2)
+        finally:
+            mgr.stop()
+
+    def test_custom_manual_work_and_rest_durations_persist_and_restore(self):
+        import app as app_mod
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            real_cm = cfg_mod.ConfigManager(config_dir=tmpdir)
+            with patch.object(app_mod, "ConfigManager", return_value=real_cm), \
+                 patch.object(app_mod, "EyeGuardGammaEngine") as MockGamma, \
+                 patch.object(app_mod, "DesktopOverlayManager"), \
+                 patch.object(app_mod, "Win32FocusRuler"), \
+                 patch.object(app_mod, "MagicWindowEngine"), \
+                 patch.object(app_mod, "HotkeyEngine"), \
+                 patch.object(app_mod, "TrayManager"), \
+                 patch("core.system_events.SystemEventsMonitor"):
+                mock_eng = MockGamma.return_value
+                mock_eng.get_monitors.return_value = []
+                mock_eng.get_hardware_brightness.return_value = 80
+                mock_eng.get_active_backend.return_value = "hardware_lut"
+
+                eg = app_mod.EyeGuardApp()
+                self.addCleanup(eg.hard_exit)
+
+                status = eg.configure_timer(
+                    work_min=52,
+                    break_sec=45,
+                    enable_20_20=True,
+                    enable_pomodoro=True,
+                    long_cycles=3,
+                    long_break_min=22,
+                )
+                self.assertEqual(status["work_minutes"], 52)
+                self.assertEqual(status["work_duration"], 52 * 60)
+                self.assertEqual(status["short_break_seconds"], 45)
+                self.assertEqual(status["cycles_before_long"], 3)
+                self.assertEqual(status["long_break_minutes"], 22)
+                self.assertEqual(real_cm.get("timer", "short_break_seconds"), 45)
+                self.assertEqual(real_cm.get("timer", "work_minutes"), 52)
+                self.assertEqual(real_cm.get("timer", "long_break_minutes"), 22)
+                real_cm._write_to_disk()
+
+            # Re-open from persisted config on disk
+            reloaded_cm = cfg_mod.ConfigManager(config_dir=tmpdir)
+            with patch.object(app_mod, "ConfigManager", return_value=reloaded_cm), \
+                 patch.object(app_mod, "EyeGuardGammaEngine") as MockGamma2, \
+                 patch.object(app_mod, "DesktopOverlayManager"), \
+                 patch.object(app_mod, "Win32FocusRuler"), \
+                 patch.object(app_mod, "MagicWindowEngine"), \
+                 patch.object(app_mod, "HotkeyEngine"), \
+                 patch.object(app_mod, "TrayManager"), \
+                 patch("core.system_events.SystemEventsMonitor"):
+                mock_eng2 = MockGamma2.return_value
+                mock_eng2.get_monitors.return_value = []
+                mock_eng2.get_hardware_brightness.return_value = 80
+                mock_eng2.get_active_backend.return_value = "hardware_lut"
+
+                eg2 = app_mod.EyeGuardApp()
+                self.addCleanup(eg2.hard_exit)
+                st2 = eg2.get_timer_status()
+                self.assertEqual(st2["work_minutes"], 52)
+                self.assertEqual(st2["short_break_seconds"], 45)
+                self.assertEqual(st2["cycles_before_long"], 3)
+                self.assertEqual(st2["long_break_minutes"], 22)
+
+
 if __name__ == "__main__":
     unittest.main()
