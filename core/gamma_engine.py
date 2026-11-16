@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 from ctypes import wintypes
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32

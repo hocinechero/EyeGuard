@@ -177,7 +177,7 @@ def force_foreground_window(hwnd: int):
 
 
 class EyeGuardApp:
-    VERSION = "4.0.0"
+    VERSION = "4.0.1"
 
     def __init__(self):
         # 1. Config & Dynamic LocalAppData Storage
@@ -230,6 +230,10 @@ class EyeGuardApp:
             enable_anim=fr_cfg.get("enable_anim", True),
             anim_ms=fr_cfg.get("anim_ms", 200),
             current_monitor_only=fr_cfg.get("current_monitor_only", True),
+            spotlight_scope=fr_cfg.get("spotlight_scope", None),
+            spotlight_target_monitors=fr_cfg.get("spotlight_target_monitors", []),
+            spotlight_other_monitors_100=fr_cfg.get("spotlight_other_monitors_100", True),
+            spotlight_pause_on_fullscreen=fr_cfg.get("spotlight_pause_on_fullscreen", False),
         )
 
         mx_cfg = self.config_mgr.get("magic_x", default={}) or {}
@@ -992,6 +996,21 @@ class EyeGuardApp:
             self.gamma_engine.deep_crimson = False
             self.config_mgr.set("screen", "deep_crimson", False)
 
+    def _apply_preset_values(self, name: str, k: int, b: int):
+        min_k = self._get_min_kelvin()
+        min_b = self._get_min_brightness()
+        self.current_k = max(min_k, min(6500, int(k)))
+        self.current_b = max(min_b, min(100, int(b)))
+        self.gamma_engine.set_display(
+            self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
+        )
+        self.config_mgr.set("screen", "kelvin", self.current_k)
+        self.config_mgr.set("screen", "brightness", self.current_b)
+        if bool(self.config_mgr.get("screen", "link_hardware_brightness", default=False)):
+            self.set_hardware_brightness(self.current_b)
+        self._schedule_tray_update()
+        return {"name": name, "kelvin": self.current_k, "brightness": self.current_b}
+
     def apply_preset_name(self, name: str):
         self._filter_disabled_until_ts = None
         self.gamma_engine.green_background = bool(
@@ -1002,23 +1021,22 @@ class EyeGuardApp:
             self.config_mgr.set("circadian", "enabled", False)
         self._clear_deep_crimson_if_active()
         self.config_mgr.set("screen", "mode", str(name))
+
         saved_presets = self.config_mgr.get("presets", default={}) or {}
-        min_k = self._get_min_kelvin()
-        min_b = self._get_min_brightness()
         if name in saved_presets and isinstance(saved_presets[name], dict):
-            k = int(saved_presets[name].get("kelvin", 5000))
-            b = int(saved_presets[name].get("brightness", 85))
-            self.current_k = max(min_k, min(6500, k))
-            self.current_b = max(min_b, min(100, b))
-            self.gamma_engine.set_display(
-                self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
+            return self._apply_preset_values(
+                name,
+                saved_presets[name].get("kelvin", saved_presets[name].get("k", 5000)),
+                saved_presets[name].get("brightness", saved_presets[name].get("b", 85)),
             )
-            self.config_mgr.set("screen", "kelvin", self.current_k)
-            self.config_mgr.set("screen", "brightness", self.current_b)
-            if bool(self.config_mgr.get("screen", "link_hardware_brightness", default=False)):
-                self.set_hardware_brightness(self.current_b)
-            self._schedule_tray_update()
-            return {"name": name, "kelvin": self.current_k, "brightness": self.current_b}
+
+        custom_presets = self.config_mgr.get("custom_presets", default={}) or {}
+        if name in custom_presets and isinstance(custom_presets[name], dict):
+            return self._apply_preset_values(
+                name,
+                custom_presets[name].get("kelvin", custom_presets[name].get("k", 5000)),
+                custom_presets[name].get("brightness", custom_presets[name].get("b", 85)),
+            )
 
         presets = {
             "Health": (5000, 85),
@@ -1033,28 +1051,103 @@ class EyeGuardApp:
         }
         if name in presets:
             k, b = presets[name]
-            self.current_k = max(min_k, min(6500, k))
-            self.current_b = max(min_b, min(100, b))
-            self.gamma_engine.set_display(
-                self.current_k, self.current_b, self.is_gray, self.is_invert, smooth=True, color_mode=self.color_filter_mode
-            )
-            self.config_mgr.set("screen", "kelvin", self.current_k)
-            self.config_mgr.set("screen", "brightness", self.current_b)
-            if bool(self.config_mgr.get("screen", "link_hardware_brightness", default=False)):
-                self.set_hardware_brightness(self.current_b)
-            self._schedule_tray_update()
+            return self._apply_preset_values(name, k, b)
         return {"name": name, "kelvin": self.current_k, "brightness": self.current_b}
 
-    def save_custom_preset(self, name: str, kelvin: int, brightness: int):
-        presets = self.config_mgr.get("presets", default={}) or {}
-        presets[str(name)] = {
-            "kelvin": int(kelvin),
-            "brightness": int(brightness),
-            "k": int(kelvin),
-            "b": int(brightness),
+    def save_custom_preset(self, name: str, kelvin: int, brightness: int, is_custom: bool = None):
+        clean_name = str(name or "").strip()[:40]
+        if not clean_name:
+            return {"ok": False, "error": "Preset name cannot be empty."}
+        kv = max(0, min(6500, int(kelvin)))
+        bv = max(1, min(100, int(brightness)))
+        entry = {"kelvin": kv, "brightness": bv, "k": kv, "b": bv}
+
+        is_builtin = clean_name in DEFAULT_CONFIG["presets"]
+        presets = dict(self.config_mgr.get("presets", default={}) or {})
+        custom_presets = dict(self.config_mgr.get("custom_presets", default={}) or {})
+
+        if is_builtin and is_custom is not True:
+            presets[clean_name] = entry
+            self.config_mgr.set("presets", presets)
+        else:
+            custom_presets[clean_name] = entry
+            self.config_mgr.set("custom_presets", custom_presets)
+
+        bak = self.config_mgr.write_presets_backup(reason=f"save_preset:{clean_name}")
+        return {
+            "ok": True,
+            "name": clean_name,
+            "presets": presets,
+            "custom_presets": custom_presets,
+            "backup": bak,
         }
-        self.config_mgr.set("presets", presets)
-        return presets
+
+    def delete_custom_preset(self, name: str):
+        clean_name = str(name or "").strip()
+        custom_presets = dict(self.config_mgr.get("custom_presets", default={}) or {})
+        removed = custom_presets.pop(clean_name, None)
+        self.config_mgr.set("custom_presets", custom_presets)
+        bak = self.config_mgr.write_presets_backup(reason=f"delete_preset:{clean_name}")
+        return {
+            "ok": removed is not None,
+            "presets": dict(self.config_mgr.get("presets", default={}) or {}),
+            "custom_presets": custom_presets,
+            "backup": bak,
+        }
+
+    def get_all_presets(self):
+        return {
+            "presets": self.config_mgr.get("presets", default={}) or {},
+            "custom_presets": self.config_mgr.get("custom_presets", default={}) or {},
+            "backup": self.config_mgr.get_presets_backup_info(),
+        }
+
+    def export_presets_backup(self, dest_path: str = None):
+        target = dest_path
+        if target is None and getattr(self, "_window", None):
+            try:
+                res = self._window.create_file_dialog(
+                    webview.SAVE_DIALOG,
+                    directory=str(self.config_mgr.backup_dir),
+                    save_filename="EyeGuard_Presets_Backup.json",
+                    file_types=("EyeGuard Backup (*.json)", "All files (*.*)"),
+                )
+                if res:
+                    target = str(res[0] if isinstance(res, (list, tuple)) else res)
+                else:
+                    return {"ok": False, "cancelled": True}
+            except Exception:
+                target = None
+        return self.config_mgr.export_presets_backup(target)
+
+    def import_presets_backup(self, src_path: str = None):
+        target = src_path
+        if target is None and getattr(self, "_window", None):
+            try:
+                res = self._window.create_file_dialog(
+                    webview.OPEN_DIALOG,
+                    directory=str(self.config_mgr.backup_dir),
+                    allow_multiple=False,
+                    file_types=("EyeGuard Backup (*.json)", "All files (*.*)"),
+                )
+                if res and len(res) > 0:
+                    target = str(res[0])
+                else:
+                    return {"ok": False, "cancelled": True}
+            except Exception:
+                target = None
+        return self.config_mgr.restore_presets_backup(target)
+
+    def restore_last_crash_backup(self):
+        return self.config_mgr.restore_presets_backup(None)
+
+    def open_backups_folder(self):
+        try:
+            self.config_mgr.backup_dir.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(self.config_mgr.backup_dir))
+            return {"ok": True, "path": str(self.config_mgr.backup_dir)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def reset_presets_to_default(self):
         default_presets = {}
@@ -1063,6 +1156,7 @@ class EyeGuardApp:
             bv = int(vals.get("brightness", vals.get("b", 85)))
             default_presets[k_name] = {"kelvin": kv, "brightness": bv, "k": kv, "b": bv}
         self.config_mgr.set("presets", default_presets)
+        self.config_mgr.write_presets_backup(reason="reset_defaults")
         return default_presets
 
     def open_url(self, url: str):
@@ -1185,7 +1279,7 @@ class EyeGuardApp:
         self.config_mgr.set("focus_ruler", "color_hex", str(color_hex))
 
     def set_spotlight_opacity(self, a: float):
-        val = max(0.05, min(0.98, float(a)))
+        val = max(0.05, min(1.0, float(a)))
         res = self.focus_ruler.configure_spotlight(opacity=val)
         self.config_mgr.set("focus_ruler", "spotlight_opacity", val)
         return res
@@ -1196,6 +1290,11 @@ class EyeGuardApp:
             if v is not None:
                 cfg_key = "spotlight_enabled" if k == "enabled" else k
                 self.config_mgr.set("focus_ruler", cfg_key, v)
+        if kwargs.get("spotlight_scope") is not None:
+            self.config_mgr.set("focus_ruler", "current_monitor_only", str(kwargs["spotlight_scope"]) == "current")
+        elif kwargs.get("current_monitor_only") is not None:
+            scope = "current" if bool(kwargs["current_monitor_only"]) else "all_monitors"
+            self.config_mgr.set("focus_ruler", "spotlight_scope", scope)
         return res
 
     def get_focus_config(self):
@@ -1937,6 +2036,8 @@ class EyeGuardApp:
             "timer": self.config_mgr.get("timer", default={}) or {},
             "screen": self.config_mgr.get("screen", default={}) or {},
             "presets": self.config_mgr.get("presets", default={}) or {},
+            "custom_presets": self.config_mgr.get("custom_presets", default={}) or {},
+            "presets_backup": self.config_mgr.get_presets_backup_info(),
             "custom_rules": self.config_mgr.get("custom_rules", default={}) or {},
         }
 
@@ -2184,6 +2285,10 @@ class EyeGuardApp:
             self.gamma_engine.shutdown()
         except Exception:
             pass
+        try:
+            self.config_mgr.flush()
+        except Exception:
+            pass
         if self._window:
             try:
                 self._window.destroy()
@@ -2232,11 +2337,29 @@ class JSBridgeApi:
     def apply_preset(self, name):
         return self._app.apply_preset_name(str(name))
 
-    def save_custom_preset(self, name, kelvin, brightness):
-        return self._app.save_custom_preset(str(name), int(kelvin), int(brightness))
+    def save_custom_preset(self, name, kelvin, brightness, is_custom=None):
+        return self._app.save_custom_preset(str(name), int(kelvin), int(brightness), is_custom=is_custom)
 
     def save_preset_values(self, name, kelvin, brightness):
-        return self._app.save_custom_preset(str(name), int(kelvin), int(brightness))
+        return self._app.save_custom_preset(str(name), int(kelvin), int(brightness), is_custom=False)
+
+    def delete_custom_preset(self, name):
+        return self._app.delete_custom_preset(str(name))
+
+    def get_all_presets(self):
+        return self._app.get_all_presets()
+
+    def export_presets_backup(self):
+        return self._app.export_presets_backup()
+
+    def import_presets_backup(self):
+        return self._app.import_presets_backup()
+
+    def restore_last_crash_backup(self):
+        return self._app.restore_last_crash_backup()
+
+    def open_backups_folder(self):
+        return self._app.open_backups_folder()
 
     def reset_presets_to_default(self):
         return self._app.reset_presets_to_default()
@@ -2335,6 +2458,10 @@ class JSBridgeApi:
         enable_anim=None,
         anim_ms=None,
         current_monitor_only=None,
+        spotlight_scope=None,
+        spotlight_target_monitors=None,
+        spotlight_other_monitors_100=None,
+        spotlight_pause_on_fullscreen=None,
     ):
         return self._app.configure_spotlight_focus(
             enabled=enabled,
@@ -2344,6 +2471,10 @@ class JSBridgeApi:
             enable_anim=enable_anim,
             anim_ms=anim_ms,
             current_monitor_only=current_monitor_only,
+            spotlight_scope=spotlight_scope,
+            spotlight_target_monitors=spotlight_target_monitors,
+            spotlight_other_monitors_100=spotlight_other_monitors_100,
+            spotlight_pause_on_fullscreen=spotlight_pause_on_fullscreen,
         )
 
     def get_focus_config(self):

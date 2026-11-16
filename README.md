@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://hocinechero.github.io/EyeGuard/"><img src="https://img.shields.io/badge/Website-EyeGuard-14b8a6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Official Website"></a>
-  <a href="https://github.com/hocinechero/EyeGuard/releases"><img src="https://img.shields.io/badge/Release-v4.0.0-14b8a6?style=for-the-badge&logo=github" alt="Release v4.0.0"></a>
+  <a href="https://github.com/hocinechero/EyeGuard/releases"><img src="https://img.shields.io/badge/Release-v4.0.1-14b8a6?style=for-the-badge&logo=github" alt="Release v4.0.1"></a>
   <a href="https://github.com/microsoft/winget-pkgs/pull/479611"><img src="https://img.shields.io/badge/Winget-hocinechero.EyeGuard-0078d4?style=for-the-badge&logo=windows-terminal&logoColor=white" alt="Winget Available"></a>
-  <a href="https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.0"><img src="https://img.shields.io/badge/Checksums-SHA--256%20Verified-10b981?style=for-the-badge&logo=github" alt="SHA-256 Checksums (v4.0.0)"></a>
+  <a href="https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1"><img src="https://img.shields.io/badge/Checksums-SHA--256%20Verified-10b981?style=for-the-badge&logo=github" alt="SHA-256 Checksums (v4.0.1)"></a>
   <a href="https://alternativeto.net/software/eyeguard/"><img src="https://img.shields.io/badge/AlternativeTo-EyeGuard-1e88e5?style=for-the-badge" alt="AlternativeTo Listing"></a>
   <a href="https://github.com/hocinechero/EyeGuard"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0ea5e9?style=for-the-badge&logo=windows" alt="Windows 10 / 11"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-teal?style=for-the-badge" alt="MIT License"></a>
@@ -28,7 +28,7 @@
 
 <div align="center">
 
-### 🚀 Instant Downloads & Installation (Version 4.0.0)
+### 🚀 Instant Downloads & Installation (Version 4.0.1)
 
 🌐 **Official Website:** **[hocinechero.github.io/EyeGuard](https://hocinechero.github.io/EyeGuard/)**
 
@@ -39,14 +39,13 @@ winget install hocinechero.EyeGuard
 
 | Package | Description | Direct Download | SHA-256 Verification |
 | :--- | :--- | :---: | :---: |
-| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.0/EyeGuard_Portable.zip) | [`343C4914...89AB0A96`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.0) |
-| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.0/EyeGuard_Setup.exe) | [`DE2266AC...38BDC250`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.0) |
+| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.1/EyeGuard_Portable.zip) | [`D45B35FA...8A33706B`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1) |
+| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.1/EyeGuard_Setup.exe) | [`DC073D36...627032D5`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1) |
 | 🪟 **Winget Package** | Official Windows Package Manager distribution ([`PR #479611`](https://github.com/microsoft/winget-pkgs/pull/479611)). | `winget install hocinechero.EyeGuard` | Microsoft Pipeline |
 
-**v4.0.0 Release SHA-256 Checksums** ([GitHub Release](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.0)):
-- `EyeGuard_Portable.zip` (`41,874,749` bytes): `343C4914B949C4AA40C9C87C2653EBC5307991B5EC543D305CDE44E089AB0A96`
-- `EyeGuard_Setup.exe` (`32,825,764` bytes): `DE2266AC2D4D996AC1302A354861CA597E0435A4E8D366D3F91AA41C38BDC250`
-- `EyeGuard-Source.zip` (`34,761,875` bytes): `9936CAA0AE26551B24D03D8D7BB7B99FF7CBB155CEFB8CD62515C3775DB80386`
+**v4.0.1 Release SHA-256 Checksums** ([GitHub Release](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1)):
+- `EyeGuard_Portable.zip` (`48,440,388` bytes): `D45B35FAC6E5A0BDD355294C6AD2508C90DAC225BD8D84CA9348976F8A33706B`
+- `EyeGuard_Setup.exe` (`39,511,855` bytes): `DC073D366CCF262B1688B67E568644AFB0B153513DCD7A9D392E3AB2627032D5`
 
 </div>
 
@@ -80,18 +79,17 @@ Most screen tools do only one thing: they turn your monitor orange. Dedicated do
 
 Whether you are reading research papers in Adobe Acrobat, browsing long documentation in Chrome, writing essays in Word, or reviewing code in VS Code, EyeGuard turns your display into a gentle, paper-like surface.
 
-### ✨ What's New in v4.0.0
+### ✨ What's New in v4.0.1
 
-- **Unified Sanctuary Typography Overhaul:** Refreshed the entire desktop shell and native GDI+ overlays using `Elephant` display headings, `Linux Biolinum G Bold` UI typography, and `thmanyah serif text Black` in blink reminders with optical ink centering.
-- **High-Presence Kelvin Ambient Aura (Dark & Light Linen):** Dynamic radial and full-canvas chromatic atmosphere synchronized live to the `0K – 6500K` spectrum across both Dark Sanctuary and Light Linen modes, paired with crisp high-contrast percentage badges and Kelvin endpoint labels.
-- **Manual Work, Rest & Long-Break Timer Controls:** Direct manual numeric inputs (`1–360 min` work, `5 sec – 120 min` rest in `sec` or `min`, plus custom long-break duration) synchronized bidirectionally with quick presets and exact sub-minute config persistence.
-- **0K Zero-Blue Darkroom, Deep Crimson (`Ruby+`) & Hybrid Cursor Tinting:** Calibrated monochrome night vision, smart auto-exit when adjusting temperature or circadian mode, `1%` ultra-deep dimming, and refined fullscreen/centered break overlays.
+- **Multi-Monitor Extended Spotlight & 100% Cinema Blackout:** Choose `Current`, `All Monitors`, or hand-pick specific extended displays (`EnumDisplayMonitors`) with full `100%` solid-black dimming (`alpha = 255`) on secondary screens — keeping extended monitors pitch black even when watching fullscreen video (`VLC` / `Apple TV`) on your main screen.
+- **Editable Comfort Scenes, Custom Local Presets & Crash Backup:** Edit any of the 8 built-in scenes directly or create unlimited named custom presets stored immediately in `%APPDATA%\EyeGuard\config.json` with automatic `config.bak.json` & `presets_auto_backup.json` crash recovery, plus manual JSON Export/Restore.
+- **Built on Sanctuary 4.0 + Python 3.13 Typing Fix:** Includes `Elephant` / `Linux Biolinum G` / `thmanyah serif` UI typography, manual `1–360m` & `5s–120m` Work/Rest timers, `0K Ruby+` cursor tinting, and restored `Tuple` annotation compatibility on Python 3.13.
 
 ---
 
 ### 📊 How EyeGuard Compares
 
-| Feature | Windows Night Light | f.lux | CareUEyes (Paid) | 🛡️ **EyeGuard (v4.0.0)** |
+| Feature | Windows Night Light | f.lux | CareUEyes (Paid) | 🛡️ **EyeGuard (v4.0.1)** |
 | :--- | :---: | :---: | :---: | :---: |
 | **True `0K` Zero-Blue Darkroom & Deep Crimson** | ❌ No | ❌ No (`1200K` min) | ❌ No (`2000K` min) | ✅ **Yes (`0K` Pure Red + Cursor Tinting)** |
 | **Line-by-Line Reading Ruler** | ❌ No | ❌ No | 💲 $20/yr | ✅ **Yes (Smooth Cursor Tracking)** |

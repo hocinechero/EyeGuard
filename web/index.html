@@ -801,6 +801,130 @@
             white-space: nowrap;
         }
 
+        .preset-tile-actions {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            display: flex;
+            gap: 3px;
+            opacity: 0.42;
+            transition: opacity 0.15s ease;
+        }
+        .preset-tile:hover .preset-tile-actions,
+        .preset-tile.active .preset-tile-actions {
+            opacity: 1;
+        }
+        .preset-mini-btn {
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-pill);
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10.5px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+        }
+        .preset-mini-btn:hover {
+            border-color: rgba(45, 212, 191, 0.5);
+            color: var(--accent-teal-text);
+            background: var(--accent-teal-subtle);
+        }
+        .preset-mini-btn.del:hover {
+            border-color: rgba(239, 68, 68, 0.55);
+            color: var(--danger-text);
+            background: rgba(239, 68, 68, 0.12);
+        }
+
+        .preset-editor-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-default);
+            border-radius: var(--r-xl);
+            padding: 13px 15px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .preset-editor-card.open { display: flex; }
+        .preset-editor-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr;
+            gap: 9px;
+        }
+        @media (max-width: 640px) {
+            .preset-editor-grid { grid-template-columns: 1fr; }
+        }
+        .preset-backup-strip {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 9px 13px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--r-lg);
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .spot-multimon-panel {
+            margin-top: 8px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .spot-checks-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .mini-check-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: var(--r-pill);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-pill);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+        .mini-check-pill input { accent-color: #14b8a6; cursor: pointer; }
+        .spot-monitors-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .monitor-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: var(--r-pill);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.14s ease;
+        }
+        .monitor-chip.selected {
+            border-color: rgba(20, 184, 166, 0.55);
+            background: var(--accent-teal-subtle);
+            color: var(--accent-teal-text);
+        }
+
         /* Optical Shield Cards */
         .grid-2-responsive {
             display: grid;
@@ -2253,9 +2377,16 @@
                     </div>
 
                     <!-- Comfort Scenes -->
-                    <div class="section-bar">
-                        <span class="presets-header" id="lbl-presets-header">Comfort Scenes</span>
-                        <button class="btn-ghost" onclick="resetPresetsToDefault()">Reset defaults</button>
+                    <div class="section-bar" style="flex-wrap:wrap;">
+                        <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">
+                            <span class="presets-header" id="lbl-presets-header">Comfort Scenes</span>
+                            <span id="lbl-preset-backup-status" class="theme-active-pill" style="font-size:10px;">Local Backup Ready</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <button class="btn-ghost" id="btn-save-active-preset" onclick="saveCurrentToActivePreset()" title="Save current Kelvin & brightness sliders into the selected scene">Save Current → Active</button>
+                            <button class="btn-ghost" onclick="openPresetEditor('', true)" title="Create a new local preset">+ Custom</button>
+                            <button class="btn-ghost" onclick="resetPresetsToDefault()">Reset defaults</button>
+                        </div>
                     </div>
                     <div class="presets-matrix">
                         <div class="preset-tile active" data-preset="Health" onclick="selectPreset('Health', 5000, 85)">
@@ -2264,6 +2395,9 @@
                                 <div class="tile-title"><span id="p-t-health">Health</span></div>
                                 <div class="tile-sub" id="psub-Health">5000K · 85%</div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Health', false)" title="Edit Health preset">✎</button>
+                            </span>
                         </div>
                         <div class="preset-tile" data-preset="Office" onclick="selectPreset('Office', 5500, 90)">
                             <span class="preset-orb orb-office"></span>
@@ -2271,6 +2405,9 @@
                                 <div class="tile-title"><span id="p-t-office">Office</span></div>
                                 <div class="tile-sub" id="psub-Office">5500K · 90%</div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Office', false)" title="Edit Office preset">✎</button>
+                            </span>
                         </div>
                         <div class="preset-tile" data-preset="Reading" onclick="selectPreset('Reading', 4000, 95)">
                             <span class="preset-orb orb-reading"></span>
@@ -2278,6 +2415,9 @@
                                 <div class="tile-title"><span id="p-t-reading">Reading</span></div>
                                 <div class="tile-sub" id="psub-Reading">4000K · 95%</div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Reading', false)" title="Edit Reading preset">✎</button>
+                            </span>
                         </div>
                         <div class="preset-tile" data-preset="Editing" onclick="selectPreset('Editing', 6500, 100)">
                             <span class="preset-orb orb-editing"></span>
@@ -2285,6 +2425,9 @@
                                 <div class="tile-title"><span id="p-t-cad">Editing</span><span id="p-t-editing" style="display:none;">Editing</span></div>
                                 <div class="tile-sub" id="psub-Editing">6500K · 100%</div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Editing', false)" title="Edit Editing preset">✎</button>
+                            </span>
                         </div>
                         <div class="preset-tile" data-preset="Cinema" onclick="selectPreset('Cinema', 5800, 90)">
                             <span class="preset-orb orb-cinema"></span>
@@ -2292,6 +2435,9 @@
                                 <div class="tile-title"><span id="p-t-movie">Movie</span><span id="p-t-cinema" style="display:none;">Movie</span></div>
                                 <div class="tile-sub" id="psub-Cinema">5800K · 90%</div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Cinema', false)" title="Edit Cinema preset">✎</button>
+                            </span>
                         </div>
                         <div class="preset-tile" data-preset="Gaming" onclick="selectPreset('Gaming', 6500, 100)">
                             <span class="preset-orb orb-gaming"></span>
@@ -2299,6 +2445,9 @@
                                 <div class="tile-title"><span id="p-t-gaming">Game</span></div>
                                 <div class="tile-sub" id="psub-Gaming">6500K · 100%</div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Gaming', false)" title="Edit Gaming preset">✎</button>
+                            </span>
                         </div>
                         <div class="preset-tile" data-preset="Bedtime" onclick="selectPreset('Bedtime', 2700, 65)">
                             <span class="preset-orb orb-bedtime"></span>
@@ -2306,6 +2455,9 @@
                                 <div class="tile-title"><span id="p-t-sleep">Bedtime</span><span id="p-t-bedtime" style="display:none;">Bedtime</span></div>
                                 <div class="tile-sub" id="psub-Bedtime">2700K · 65%</div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Bedtime', false)" title="Edit Bedtime preset">✎</button>
+                            </span>
                         </div>
                         <div class="preset-tile" data-preset="Biohacker" onclick="selectPreset('Biohacker', 0, 50)">
                             <span class="preset-orb orb-biohacker"></span>
@@ -2313,6 +2465,48 @@
                                 <div class="tile-title"><span id="p-t-biohacker">Ruby 0K</span></div>
                                 <div class="tile-sub" id="psub-Biohacker"><span id="p-s-biohacker">0K · 50%</span></div>
                             </div>
+                            <span class="preset-tile-actions">
+                                <button type="button" class="preset-mini-btn" onclick="event.stopPropagation(); openPresetEditor('Biohacker', false)" title="Edit Ruby 0K preset">✎</button>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Custom User Presets Matrix -->
+                    <div id="custom-presets-matrix" class="presets-matrix" style="display:none;"></div>
+
+                    <!-- Inline Preset Editor & Local Backup Bar -->
+                    <div id="preset-editor-panel" class="preset-editor-card">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                            <span class="display-subheading" id="lbl-preset-editor-title" style="font-size:14px;">Edit Preset</span>
+                            <button type="button" class="btn-ghost" onclick="fillPresetEditorFromSliders()">Use Current Sliders</button>
+                        </div>
+                        <div class="preset-editor-grid">
+                            <div>
+                                <div style="font-size:10.5px; color:var(--text-tertiary); margin-bottom:4px;">Preset Name</div>
+                                <input type="text" id="in-preset-name" class="care-select" style="width:100%;" maxlength="36" placeholder="e.g. Dim Monitor 35%">
+                            </div>
+                            <div>
+                                <div style="font-size:10.5px; color:var(--text-tertiary); margin-bottom:4px;">Kelvin (0 – 6500K)</div>
+                                <input type="number" id="in-preset-k" class="care-select" style="width:100%;" min="0" max="6500" step="50" value="4000">
+                            </div>
+                            <div>
+                                <div style="font-size:10.5px; color:var(--text-tertiary); margin-bottom:4px;">Brightness (1 – 100%)</div>
+                                <input type="number" id="in-preset-b" class="care-select" style="width:100%;" min="1" max="100" step="1" value="65">
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px;">
+                            <button type="button" class="btn-ghost" onclick="closePresetEditor()">Cancel</button>
+                            <button type="button" class="btn-linear btn-linear-primary" onclick="savePresetFromEditor()">Save &amp; Backup Locally</button>
+                        </div>
+                    </div>
+
+                    <div class="preset-backup-strip">
+                        <span id="txt-backup-summary">Presets auto-backup locally on every save (crash recovery enabled).</span>
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <button type="button" class="btn-ghost" onclick="exportPresetsBackup()">Export Backup (.json)</button>
+                            <button type="button" class="btn-ghost" onclick="importPresetsBackup()">Import File</button>
+                            <button type="button" class="btn-ghost" onclick="restoreLastCrashBackup()" title="Restore from automatic local backup">Restore Crash Backup</button>
+                            <button type="button" class="btn-ghost" onclick="openBackupsFolder()">Open Backups</button>
                         </div>
                     </div>
 
@@ -2405,12 +2599,43 @@
                                     <span id="btn-hero-spot-text">Turn ON (Ctrl+Alt+S)</span>
                                 </button>
                             </div>
-                            <div class="mini-slider-field" style="margin-top:auto;">
+                            <div class="mini-slider-field">
                                 <div class="mini-slider-head">
                                     <span>Focus Dimming Level</span>
                                     <strong id="val-hero-spot-op">60%</strong>
                                 </div>
-                                <input type="range" class="range-slider" min="10" max="95" value="60" id="slider-hero-spot-op" oninput="handleHeroSpotlightOpacity(this.value); syncSliderVisuals(this);">
+                                <input type="range" class="range-slider" min="10" max="100" value="60" id="slider-hero-spot-op" oninput="handleHeroSpotlightOpacity(this.value); syncSliderVisuals(this);">
+                            </div>
+                            <div class="spot-multimon-panel">
+                                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                                    <span style="font-size:11px; font-weight:650; color:var(--text-secondary);">Extended Display Scope</span>
+                                    <div class="scope-toggle-group">
+                                        <button type="button" id="btn-spot-scope-current" class="scope-btn active" onclick="setSpotlightScope('current')">Current</button>
+                                        <button type="button" id="btn-spot-scope-all" class="scope-btn" onclick="setSpotlightScope('all_monitors')">All Monitors</button>
+                                        <button type="button" id="btn-spot-scope-sel" class="scope-btn" onclick="setSpotlightScope('selected')">Choose</button>
+                                    </div>
+                                </div>
+                                <div class="spot-checks-row">
+                                    <label class="mini-check-pill" title="Turn other extended monitors 100% pitch black even when watching fullscreen video (VLC / Apple TV)">
+                                        <input type="checkbox" id="chk-spot-other-100" checked onchange="saveSpotlightMultiConfig()">
+                                        <span>100% Black Other Displays</span>
+                                    </label>
+                                    <label class="mini-check-pill" title="Cover the Windows taskbar area">
+                                        <input type="checkbox" id="chk-spot-taskbar" onchange="saveSpotlightMultiConfig()">
+                                        <span>Taskbar</span>
+                                    </label>
+                                    <label class="mini-check-pill" title="Disable Spotlight completely while any fullscreen window is active">
+                                        <input type="checkbox" id="chk-spot-pause-fs" onchange="saveSpotlightMultiConfig()">
+                                        <span>Pause Fullscreen</span>
+                                    </label>
+                                </div>
+                                <div id="spot-monitors-wrap" style="display:none; flex-direction:column; gap:5px;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                                        <span id="lbl-spot-monitors-hint" style="font-size:10.5px; color:var(--text-tertiary);">Select displays to dim / blackout (active fullscreen stays clear):</span>
+                                        <button type="button" class="btn-ghost" style="padding:2px 8px; font-size:10px;" onclick="loadFocusConfig()">Refresh</button>
+                                    </div>
+                                    <div id="spot-monitors-list" class="spot-monitors-list"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3470,7 +3695,7 @@
                             <img src="assets/logo_eye.png" width="70" height="44" style="object-fit:contain;" alt="EyeGuard Logo">
                         </div>
                         <h2 class="display-heading" style="font-size:26px;">EyeGuard</h2>
-                        <span class="theme-active-pill">v4.0.0 · Open Source Eye Care Suite · @hocine_chero</span>
+                        <span class="theme-active-pill">v4.0.1 · Open Source Eye Care Suite · @hocine_chero</span>
                         <p style="font-size:12.5px; color:var(--text-secondary); max-width:460px; margin:2px auto 6px; line-height:1.6;">
                             Free, offline, and open-source desktop eye comfort &amp; reading studio for Windows by <b>@hocine_chero</b>.
                         </p>
@@ -3674,11 +3899,30 @@
         
         // --- Added Missing Functions & Global Presets for Seamless Reliability ---
         let PRESETS = {};
+        let savedCustomPresetsCache = {};
+        let presetEditorMode = { open: false, isNew: false, targetName: '' };
+
+        function updateSinglePresetSubtitle(name, k, b) {
+            if (name === 'Biohacker') {
+                const subBio = document.getElementById('p-s-biohacker') || document.getElementById('psub-Biohacker');
+                if (subBio) subBio.innerText = `${k}K · ${b}%`;
+            } else {
+                const subEl = document.getElementById(`psub-${name}`);
+                if (subEl) subEl.innerText = `${k}K · ${b}%`;
+            }
+        }
+
         function refreshPresetCardsDisplay() {
             if (typeof savedPresetsCache === 'object' && typeof PRESETS === 'object') {
                 Object.keys(PRESETS).forEach(k => {
-                    savedPresetsCache[k] = { kelvin: PRESETS[k].k, brightness: PRESETS[k].b };
+                    const kv = typeof PRESETS[k].kelvin === 'number' ? PRESETS[k].kelvin : PRESETS[k].k;
+                    const bv = typeof PRESETS[k].brightness === 'number' ? PRESETS[k].brightness : PRESETS[k].b;
+                    savedPresetsCache[k] = { kelvin: kv, brightness: bv, k: kv, b: bv };
+                    updateSinglePresetSubtitle(k, kv, bv);
                 });
+            }
+            if (typeof renderCustomPresets === 'function') {
+                renderCustomPresets();
             }
         }
 
@@ -4389,7 +4633,7 @@
 
         async function selectPreset(name, defaultK, defaultB) {
             document.querySelectorAll('.preset-tile').forEach(t => t.classList.remove('active'));
-            const tile = document.querySelector(`.preset-tile[data-preset="${name}"]`) || (event && event.currentTarget);
+            const tile = document.querySelector(`.preset-tile[data-preset="${CSS.escape ? CSS.escape(name) : name}"]`) || (event && event.currentTarget);
             if (tile) tile.classList.add('active');
             currentPresetKey = name;
             clearDeepCrimsonUiState();
@@ -4399,6 +4643,9 @@
             if (savedPresetsCache[name]) {
                 k = savedPresetsCache[name].kelvin;
                 b = savedPresetsCache[name].brightness;
+            } else if (savedCustomPresetsCache[name]) {
+                k = savedCustomPresetsCache[name].kelvin;
+                b = savedCustomPresetsCache[name].brightness;
             }
             if (window.pywebview && window.pywebview.api && window.pywebview.api.apply_preset) {
                 const applied = await window.pywebview.api.apply_preset(name);
@@ -4420,10 +4667,265 @@
             updatePresetBadge();
             const vbEl = document.getElementById('val-bright-hero');
             if (vbEl) vbEl.innerText = b;
-            updateKelvinText(k);
-            document.getElementById('val-bright-hero').innerText = b;
-            updatePresetBadge();
+            updateSinglePresetSubtitle(name, k, b);
             updateBlackoutWarningBanner();
+        }
+
+        function kelvinOrbGradient(k) {
+            if (k <= 800) return 'radial-gradient(circle at 30% 30%, #fda4af, #9f1239)';
+            if (k <= 3000) return 'radial-gradient(circle at 30% 30%, #fdba74, #c2410c)';
+            if (k <= 4500) return 'radial-gradient(circle at 30% 30%, #fde68a, #d97706)';
+            return 'radial-gradient(circle at 30% 30%, #a7f3d0, #0d9488)';
+        }
+
+        function renderCustomPresets() {
+            const box = document.getElementById('custom-presets-matrix');
+            if (!box) return;
+            box.textContent = '';
+            const names = Object.keys(savedCustomPresetsCache || {});
+            if (names.length === 0) {
+                box.style.display = 'none';
+                return;
+            }
+            box.style.display = 'grid';
+            names.forEach(name => {
+                const p = savedCustomPresetsCache[name] || { kelvin: 4000, brightness: 70 };
+                const kv = Number(p.kelvin ?? p.k ?? 4000);
+                const bv = Number(p.brightness ?? p.b ?? 70);
+
+                const tile = document.createElement('div');
+                tile.className = 'preset-tile' + (currentPresetKey === name ? ' active' : '');
+                tile.setAttribute('data-preset', name);
+                tile.onclick = () => selectPreset(name, kv, bv);
+
+                const orb = document.createElement('span');
+                orb.className = 'preset-orb';
+                orb.style.background = kelvinOrbGradient(kv);
+
+                const meta = document.createElement('div');
+                meta.className = 'preset-meta';
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'tile-title';
+                titleDiv.textContent = name;
+                const subDiv = document.createElement('div');
+                subDiv.className = 'tile-sub';
+                subDiv.textContent = `${kv}K · ${bv}%`;
+                meta.appendChild(titleDiv);
+                meta.appendChild(subDiv);
+
+                const actions = document.createElement('span');
+                actions.className = 'preset-tile-actions';
+
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.className = 'preset-mini-btn';
+                editBtn.title = `Edit ${name}`;
+                editBtn.textContent = '✎';
+                editBtn.onclick = (ev) => {
+                    ev.stopPropagation();
+                    openPresetEditor(name, true);
+                };
+
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'preset-mini-btn del';
+                delBtn.title = `Delete ${name}`;
+                delBtn.textContent = '×';
+                delBtn.onclick = (ev) => {
+                    ev.stopPropagation();
+                    deleteCustomPreset(name);
+                };
+
+                actions.appendChild(editBtn);
+                actions.appendChild(delBtn);
+
+                tile.appendChild(orb);
+                tile.appendChild(meta);
+                tile.appendChild(actions);
+                box.appendChild(tile);
+            });
+        }
+
+        function updateBackupStatusUI(info, customMsg) {
+            const pill = document.getElementById('lbl-preset-backup-status');
+            const summary = document.getElementById('txt-backup-summary');
+            if (pill) {
+                if (customMsg) {
+                    pill.innerText = customMsg;
+                } else if (info && info.recovered_on_boot) {
+                    pill.innerText = 'Recovered from Crash Backup';
+                } else if (info && info.has_auto_backup) {
+                    pill.innerText = 'Auto-Backed Up';
+                } else {
+                    pill.innerText = 'Local Backup Ready';
+                }
+            }
+            if (summary && info && info.saved_at) {
+                const shortTime = String(info.saved_at).replace('T', ' ').slice(0, 19);
+                summary.innerText = `Local crash backup updated (${shortTime} UTC) — ${info.custom_count || 0} custom preset(s).`;
+            }
+        }
+
+        async function loadAllPresets() {
+            if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_all_presets) return;
+            try {
+                const res = await window.pywebview.api.get_all_presets();
+                if (!res) return;
+                if (res.presets && typeof res.presets === 'object') {
+                    savedPresetsCache = res.presets;
+                    Object.keys(res.presets).forEach(k => {
+                        const kv = Number(res.presets[k].kelvin ?? res.presets[k].k ?? 5000);
+                        const bv = Number(res.presets[k].brightness ?? res.presets[k].b ?? 85);
+                        PRESETS[k] = { k: kv, b: bv, kelvin: kv, brightness: bv };
+                        updateSinglePresetSubtitle(k, kv, bv);
+                    });
+                }
+                if (res.custom_presets && typeof res.custom_presets === 'object') {
+                    savedCustomPresetsCache = res.custom_presets;
+                    renderCustomPresets();
+                }
+                if (res.backup) {
+                    updateBackupStatusUI(res.backup);
+                }
+            } catch (e) {
+                console.error('Failed to load presets:', e);
+            }
+        }
+
+        function openPresetEditor(name, allowRename) {
+            const panel = document.getElementById('preset-editor-panel');
+            const titleEl = document.getElementById('lbl-preset-editor-title');
+            const nameIn = document.getElementById('in-preset-name');
+            const kIn = document.getElementById('in-preset-k');
+            const bIn = document.getElementById('in-preset-b');
+            if (!panel || !nameIn || !kIn || !bIn) return;
+
+            const isNew = !name;
+            presetEditorMode = { open: true, isNew, targetName: name || '' };
+            const src = (!isNew && (savedPresetsCache[name] || savedCustomPresetsCache[name])) || null;
+            if (titleEl) {
+                titleEl.innerText = isNew ? 'New Local Custom Preset' : `Edit Scene: ${name}`;
+            }
+            nameIn.value = name || '';
+            nameIn.readOnly = !isNew && !allowRename;
+            kIn.value = src ? Number(src.kelvin ?? src.k ?? currentK) : currentK;
+            bIn.value = src ? Number(src.brightness ?? src.b ?? currentB) : currentB;
+            panel.classList.add('open');
+        }
+
+        function closePresetEditor() {
+            const panel = document.getElementById('preset-editor-panel');
+            if (panel) panel.classList.remove('open');
+            presetEditorMode.open = false;
+        }
+
+        function fillPresetEditorFromSliders() {
+            const kIn = document.getElementById('in-preset-k');
+            const bIn = document.getElementById('in-preset-b');
+            if (kIn) kIn.value = currentK;
+            if (bIn) bIn.value = currentB;
+        }
+
+        async function savePresetFromEditor() {
+            const nameIn = document.getElementById('in-preset-name');
+            const kIn = document.getElementById('in-preset-k');
+            const bIn = document.getElementById('in-preset-b');
+            if (!nameIn || !kIn || !bIn) return;
+
+            const name = nameIn.value.trim();
+            if (!name) {
+                nameIn.focus();
+                return;
+            }
+            const kv = Math.max(0, Math.min(6500, parseInt(kIn.value, 10) || 0));
+            const bv = Math.max(1, Math.min(100, parseInt(bIn.value, 10) || 50));
+
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.save_custom_preset) {
+                const isCustomFlag = nameIn.readOnly ? false : true;
+                const res = await window.pywebview.api.save_custom_preset(name, kv, bv, isCustomFlag);
+                if (res && res.ok) {
+                    if (res.presets) savedPresetsCache = res.presets;
+                    if (res.custom_presets) savedCustomPresetsCache = res.custom_presets;
+                    Object.keys(savedPresetsCache).forEach(pName => {
+                        const pv = savedPresetsCache[pName];
+                        PRESETS[pName] = { k: pv.kelvin, b: pv.brightness, kelvin: pv.kelvin, brightness: pv.brightness };
+                        updateSinglePresetSubtitle(pName, pv.kelvin, pv.brightness);
+                    });
+                    renderCustomPresets();
+                    updateBackupStatusUI(res.backup, `Saved ${name} ✓`);
+                    closePresetEditor();
+                    await selectPreset(name, kv, bv);
+                }
+            }
+        }
+
+        async function saveCurrentToActivePreset() {
+            const target = currentPresetKey && currentPresetKey !== 'Natural' ? currentPresetKey : 'Health';
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.save_custom_preset) {
+                const isBuiltIn = !!document.querySelector(`.presets-matrix .preset-tile[data-preset="${target}"]`);
+                const res = await window.pywebview.api.save_custom_preset(target, currentK, currentB, !isBuiltIn);
+                if (res && res.ok) {
+                    if (res.presets) savedPresetsCache = res.presets;
+                    if (res.custom_presets) savedCustomPresetsCache = res.custom_presets;
+                    updateSinglePresetSubtitle(target, currentK, currentB);
+                    renderCustomPresets();
+                    updateBackupStatusUI(res.backup, `Saved ${target} (${currentK}K · ${currentB}%) ✓`);
+                }
+            }
+        }
+
+        async function deleteCustomPreset(name) {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.delete_custom_preset) {
+                const res = await window.pywebview.api.delete_custom_preset(name);
+                if (res) {
+                    savedCustomPresetsCache = res.custom_presets || {};
+                    renderCustomPresets();
+                    updateBackupStatusUI(res.backup, `Deleted ${name}`);
+                    if (currentPresetKey === name) {
+                        selectPreset('Health', 5000, 85);
+                    }
+                }
+            }
+        }
+
+        async function exportPresetsBackup() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.export_presets_backup) {
+                const res = await window.pywebview.api.export_presets_backup();
+                if (res && res.ok) {
+                    updateBackupStatusUI(res, 'Backup Exported ✓');
+                }
+            }
+        }
+
+        async function importPresetsBackup() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.import_presets_backup) {
+                const res = await window.pywebview.api.import_presets_backup();
+                if (res && res.ok) {
+                    await loadAllPresets();
+                    updateBackupStatusUI(null, 'Backup Restored ✓');
+                    if (currentPresetKey && (savedPresetsCache[currentPresetKey] || savedCustomPresetsCache[currentPresetKey])) {
+                        await selectPreset(currentPresetKey, currentK, currentB);
+                    }
+                }
+            }
+        }
+
+        async function restoreLastCrashBackup() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.restore_last_crash_backup) {
+                const res = await window.pywebview.api.restore_last_crash_backup();
+                if (res && res.ok) {
+                    await loadAllPresets();
+                    updateBackupStatusUI(null, 'Crash Backup Restored ✓');
+                } else {
+                    updateBackupStatusUI(null, 'No Backup Found');
+                }
+            }
+        }
+
+        async function openBackupsFolder() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.open_backups_folder) {
+                await window.pywebview.api.open_backups_folder();
+            }
         }
 
         async function resetPresetsToDefault() {
@@ -4432,11 +4934,12 @@
                 if (defs) {
                     savedPresetsCache = defs;
                     Object.keys(defs).forEach(kName => {
-                        const subEl = document.getElementById(`psub-${kName}`);
-                        if (subEl && kName !== 'Biohacker') {
-                            subEl.innerText = `${defs[kName].kelvin}K | ${defs[kName].brightness}%`;
-                        }
+                        const kv = Number(defs[kName].kelvin ?? defs[kName].k ?? 5000);
+                        const bv = Number(defs[kName].brightness ?? defs[kName].b ?? 85);
+                        PRESETS[kName] = { k: kv, b: bv, kelvin: kv, brightness: bv };
+                        updateSinglePresetSubtitle(kName, kv, bv);
                     });
+                    updateBackupStatusUI(null, 'Defaults Restored');
                 }
             }
             selectPreset('Health', 5000, 85);
@@ -5208,6 +5711,95 @@
         // =================================================================
         // READING FOCUS & SPOTLIGHT ENGINE (TAB FOCUS)
         // =================================================================
+        let spotMonitorsList = [];
+        let spotScope = 'current';
+        let spotTargetMonitors = [];
+
+        function renderSpotlightMonitorList() {
+            const wrap = document.getElementById('spot-monitors-wrap');
+            const listEl = document.getElementById('spot-monitors-list');
+            const hintEl = document.getElementById('lbl-spot-monitors-hint');
+            if (!wrap || !listEl) return;
+
+            wrap.style.display = (spotScope === 'current') ? 'none' : 'flex';
+            if (hintEl) {
+                hintEl.innerText = (spotScope === 'all_monitors')
+                    ? 'Active fullscreen stays clear; all other detected displays blackout:'
+                    : 'Click displays to include in Spotlight / 100% cinema blackout:';
+            }
+
+            listEl.textContent = '';
+            (spotMonitorsList || []).forEach(m => {
+                const dev = String(m.device || '');
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                const isSelected = (spotScope === 'all_monitors')
+                    ? true
+                    : spotTargetMonitors.includes(dev);
+                chip.className = 'monitor-chip' + (isSelected ? ' selected' : '');
+                chip.textContent = (isSelected ? '✓ ' : '') + (m.label || dev);
+                chip.onclick = () => {
+                    if (spotScope === 'all_monitors') {
+                        spotScope = 'selected';
+                        spotTargetMonitors = (spotMonitorsList || [])
+                            .map(x => String(x.device || ''))
+                            .filter(d => d && d !== dev);
+                        syncSpotlightScopeButtons();
+                    } else {
+                        if (spotTargetMonitors.includes(dev)) {
+                            spotTargetMonitors = spotTargetMonitors.filter(d => d !== dev);
+                        } else {
+                            spotTargetMonitors = [...spotTargetMonitors, dev];
+                        }
+                    }
+                    renderSpotlightMonitorList();
+                    saveSpotlightMultiConfig();
+                };
+                listEl.appendChild(chip);
+            });
+        }
+
+        function syncSpotlightScopeButtons() {
+            const bCur = document.getElementById('btn-spot-scope-current');
+            const bAll = document.getElementById('btn-spot-scope-all');
+            const bSel = document.getElementById('btn-spot-scope-sel');
+            if (bCur) bCur.classList.toggle('active', spotScope === 'current');
+            if (bAll) bAll.classList.toggle('active', spotScope === 'all_monitors');
+            if (bSel) bSel.classList.toggle('active', spotScope === 'selected');
+        }
+
+        function setSpotlightScope(scope) {
+            spotScope = (scope === 'all_monitors' || scope === 'selected') ? scope : 'current';
+            if (spotScope === 'selected' && spotTargetMonitors.length === 0 && spotMonitorsList.length > 0) {
+                const secondaries = spotMonitorsList.filter(m => !m.is_primary).map(m => m.device);
+                spotTargetMonitors = secondaries.length > 0 ? secondaries : spotMonitorsList.map(m => m.device);
+            }
+            syncSpotlightScopeButtons();
+            renderSpotlightMonitorList();
+            saveSpotlightMultiConfig();
+        }
+
+        function saveSpotlightMultiConfig() {
+            const chkTask = document.getElementById('chk-spot-taskbar');
+            const chk100 = document.getElementById('chk-spot-other-100');
+            const chkPauseFs = document.getElementById('chk-spot-pause-fs');
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.configure_spotlight) {
+                window.pywebview.api.configure_spotlight(
+                    null,
+                    null,
+                    null,
+                    chkTask ? chkTask.checked : null,
+                    null,
+                    null,
+                    spotScope === 'current',
+                    spotScope,
+                    spotTargetMonitors,
+                    chk100 ? chk100.checked : true,
+                    chkPauseFs ? chkPauseFs.checked : false
+                );
+            }
+        }
+
         async function loadFocusConfig() {
             if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_focus_config) return;
             try {
@@ -5263,28 +5855,34 @@
                     if (heroSpotSl) heroSpotSl.value = pct;
                 }
 
-                // Spotlight Focus Controls
-                const chkSpot = document.getElementById('chk-spot-enable');
-                if (chkSpot && typeof cfg.spotlight_enabled === 'boolean') {
-                    chkSpot.checked = cfg.spotlight_enabled;
-                    updateHeroSpotBtn();
+                // Spotlight Focus & Multi-Monitor Controls
+                if (typeof cfg.spotlight_active === 'boolean') {
+                    updateSpotlightHeroBtn(cfg.spotlight_active);
                 }
 
                 const chkTask = document.getElementById('chk-spot-taskbar');
-                if (chkTask && typeof cfg.include_taskbar === 'boolean') chkTask.checked = cfg.include_taskbar;
+                if (chkTask && typeof cfg.spotlight_include_taskbar === 'boolean') chkTask.checked = cfg.spotlight_include_taskbar;
 
-                const chkAnim = document.getElementById('chk-spot-anim');
-                if (chkAnim && typeof cfg.enable_anim === 'boolean') chkAnim.checked = cfg.enable_anim;
+                const chk100 = document.getElementById('chk-spot-other-100');
+                if (chk100 && typeof cfg.spotlight_other_monitors_100 === 'boolean') chk100.checked = cfg.spotlight_other_monitors_100;
 
-                if (typeof cfg.anim_ms === 'number') {
-                    const slAnim = document.getElementById('slider-spot-anim');
-                    const vAnim = document.getElementById('val-spot-anim');
-                    if (slAnim) slAnim.value = cfg.anim_ms;
-                    if (vAnim) vAnim.innerText = `${cfg.anim_ms} ms`;
+                const chkPauseFs = document.getElementById('chk-spot-pause-fs');
+                if (chkPauseFs && typeof cfg.spotlight_pause_on_fullscreen === 'boolean') chkPauseFs.checked = cfg.spotlight_pause_on_fullscreen;
+
+                if (cfg.spotlight_scope) {
+                    spotScope = cfg.spotlight_scope;
+                } else if (typeof cfg.current_monitor_only === 'boolean') {
+                    spotScope = cfg.current_monitor_only ? 'current' : 'all_monitors';
                 }
-
-                const chkMon = document.getElementById('chk-spot-monitor');
-                if (chkMon && typeof cfg.current_monitor_only === 'boolean') chkMon.checked = cfg.current_monitor_only;
+                if (Array.isArray(cfg.spotlight_target_monitors)) {
+                    spotTargetMonitors = cfg.spotlight_target_monitors;
+                }
+                if (Array.isArray(cfg.monitors)) {
+                    spotMonitorsList = cfg.monitors;
+                }
+                syncSpotlightScopeButtons();
+                renderSpotlightMonitorList();
+                syncRangeSliderFills();
 
                 if (typeof cfg.spotlight_opacity === 'number') {
                     const spPct = cfg.spotlight_opacity > 1 ? Math.round(cfg.spotlight_opacity) : Math.round(cfg.spotlight_opacity * 100);
@@ -6266,7 +6864,7 @@
                     if (msgEl && res) msgEl.innerText = res.message || 'You are using the latest version.';
                 }
             } catch (e) {
-                if (msgEl) msgEl.innerText = 'You are using the latest stable release (v4.0.0).';
+                if (msgEl) msgEl.innerText = 'You are using the latest stable release (v4.0.1).';
             }
         }
 
@@ -6277,11 +6875,21 @@
                     if (cfg) {
                         if (cfg.presets && typeof cfg.presets === 'object') {
                             Object.keys(cfg.presets).forEach(k => {
-                                if (cfg.presets[k] && typeof cfg.presets[k].k === 'number') {
-                                    PRESETS[k] = { k: cfg.presets[k].k, b: cfg.presets[k].b };
+                                const p = cfg.presets[k];
+                                if (p) {
+                                    const kv = Number(p.kelvin ?? p.k ?? 5000);
+                                    const bv = Number(p.brightness ?? p.b ?? 85);
+                                    PRESETS[k] = { k: kv, b: bv, kelvin: kv, brightness: bv };
                                 }
                             });
                             refreshPresetCardsDisplay();
+                        }
+                        if (cfg.custom_presets && typeof cfg.custom_presets === 'object') {
+                            savedCustomPresetsCache = cfg.custom_presets;
+                            renderCustomPresets();
+                        }
+                        if (cfg.presets_backup) {
+                            updateBackupStatusUI(cfg.presets_backup);
                         }
                         if (cfg.general) {
                             document.getElementById('opt-gen-lang').value = 'en';
@@ -6933,6 +7541,7 @@
         function initApp() {
             updateBlackoutWarningBanner();
             loadHotkeys();
+            loadAllPresets();
             loadOptionsConfig();
             loadMagicConfig();
             loadFocusConfig();

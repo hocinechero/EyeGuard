@@ -12,12 +12,16 @@ import queue
 import threading
 import time
 from ctypes import wintypes
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
 gdi32 = ctypes.windll.gdi32
 dwmapi = ctypes.windll.dwmapi
+
+CCHDEVICENAME = 32
+MONITORINFOF_PRIMARY = 0x00000001
+MONITOR_DEFAULTTONEAREST = 2
 
 
 class MONITORINFO(ctypes.Structure):
@@ -27,6 +31,21 @@ class MONITORINFO(ctypes.Structure):
         ("rcWork", wintypes.RECT),
         ("dwFlags", wintypes.DWORD),
     ]
+
+
+class MONITORINFOEXW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+        ("szDevice", wintypes.WCHAR * CCHDEVICENAME),
+    ]
+
+
+MONITORENUMPROC = ctypes.WINFUNCTYPE(
+    wintypes.BOOL, ctypes.c_void_p, wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.LPARAM
+)
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(2)
@@ -162,6 +181,24 @@ user32.GetAsyncKeyState.restype = ctypes.c_short
 user32.SystemParametersInfoW.argtypes = [wintypes.UINT, wintypes.UINT, wintypes.LPVOID, wintypes.UINT]
 user32.SystemParametersInfoW.restype = wintypes.BOOL
 
+user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+user32.MonitorFromWindow.restype = ctypes.c_void_p
+
+user32.GetMonitorInfoW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+user32.GetMonitorInfoW.restype = wintypes.BOOL
+
+user32.EnumDisplayMonitors.argtypes = [wintypes.HDC, ctypes.c_void_p, MONITORENUMPROC, wintypes.LPARAM]
+user32.EnumDisplayMonitors.restype = wintypes.BOOL
+
+user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.ShowWindow.restype = wintypes.BOOL
+
+user32.IsWindowVisible.argtypes = [wintypes.HWND]
+user32.IsWindowVisible.restype = wintypes.BOOL
+
+user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user32.GetClassNameW.restype = ctypes.c_int
+
 kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
 kernel32.GetModuleHandleW.restype = wintypes.HINSTANCE
 
@@ -182,6 +219,9 @@ gdi32.DeleteObject.restype = wintypes.BOOL
 
 # Global reference to current brush for dynamic background painting
 _ACTIVE_BRUSH = None
+_BLACK_BRUSH = gdi32.GetStockObject(BLACK_BRUSH)
+_SECONDARY_BLACK_HWNDS = set()
+_FORCE_SECONDARY_BLACK = True
 
 
 def hex_to_colorref(hex_str: str) -> int:
@@ -207,11 +247,13 @@ def _overlay_wnd_proc(hwnd, msg, wparam, lparam):
     """
     if msg == WM_NCHITTEST:
         return HTTRANSPARENT
-    if msg == WM_ERASEBKGND and _ACTIVE_BRUSH:
-        rc = wintypes.RECT()
-        if user32.GetClientRect(hwnd, ctypes.byref(rc)):
-            user32.FillRect(wintypes.HDC(wparam), ctypes.byref(rc), _ACTIVE_BRUSH)
-            return 1
+    if msg == WM_ERASEBKGND:
+        brush = _BLACK_BRUSH if (hwnd in _SECONDARY_BLACK_HWNDS and _FORCE_SECONDARY_BLACK) else _ACTIVE_BRUSH
+        if brush:
+            rc = wintypes.RECT()
+            if user32.GetClientRect(hwnd, ctypes.byref(rc)):
+                user32.FillRect(wintypes.HDC(wparam), ctypes.byref(rc), brush)
+                return 1
     return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 
@@ -219,7 +261,8 @@ class Win32FocusRuler:
     """
     Dual-mode native Win32 Focus Engine:
     - Mode 1 ('reading'): Horizontal Reading Focus slit tracking cursor Y.
-    - Mode 2 ('spotlight'): Spotlight Focus dimming all background windows around the active foreground window.
+    - Mode 2 ('spotlight'): Spotlight Focus dimming background clutter around the active window,
+      including independent multi-monitor extended blackout curtains (up to 100% pure black).
     """
     _CLASS_NAME = "EyeGuardRulerOverlay"
 
@@ -236,6 +279,10 @@ class Win32FocusRuler:
         self._spotlight_transition = True
         self._spotlight_anim_ms = 200
         self._spotlight_current_monitor = True
+        self._spotlight_scope = "current"  # "current" | "all_monitors" | "selected"
+        self._spotlight_target_monitors: List[str] = []
+        self._spotlight_other_100 = True
+        self._spotlight_pause_on_fullscreen = False
 
         # Smooth interpolation state for Spotlight rectangle
         self._cur_spot_rect: Optional[Tuple[float, float, float, float]] = None
@@ -244,6 +291,9 @@ class Win32FocusRuler:
         self._hwnd_bot: Optional[int] = None
         self._hwnd_left: Optional[int] = None
         self._hwnd_right: Optional[int] = None
+        self._secondary_hwnds: Dict[str, int] = {}
+        self._last_secondary_layout: Optional[Tuple[Any, ...]] = None
+        self._last_spot_applied = None
         self._is_active = False
         self._preview_esc_quit = False
         self._custom_brush = None
@@ -275,7 +325,7 @@ class Win32FocusRuler:
         f_val = float(val)
         if f_val > 1.0:
             f_val = f_val / 100.0
-        return max(0.05, min(0.95, f_val))
+        return max(0.05, min(1.0, f_val))
 
     # =========================================================================
     # Public Thread-Safe API
@@ -362,6 +412,61 @@ class Win32FocusRuler:
         self.update(color_hex=color_hex)
 
     # Spotlight Focus Controls
+    def enumerate_monitors(self) -> List[Dict[str, Any]]:
+        """Enumerates active Windows displays with device name, pixel bounds, work area, and primary flag."""
+        raw_mons = []
+
+        def _cb(hmon, hdc, lprc, lparam):
+            try:
+                mi = MONITORINFOEXW()
+                mi.cbSize = ctypes.sizeof(MONITORINFOEXW)
+                if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+                    dev = str(mi.szDevice or f"DISPLAY_{len(raw_mons) + 1}")
+                    rc = mi.rcMonitor
+                    wrc = mi.rcWork
+                    raw_mons.append({
+                        "device": dev,
+                        "is_primary": bool(mi.dwFlags & MONITORINFOF_PRIMARY),
+                        "left": int(rc.left),
+                        "top": int(rc.top),
+                        "right": int(rc.right),
+                        "bottom": int(rc.bottom),
+                        "work_left": int(wrc.left),
+                        "work_top": int(wrc.top),
+                        "work_right": int(wrc.right),
+                        "work_bottom": int(wrc.bottom),
+                        "width": int(rc.right - rc.left),
+                        "height": int(rc.bottom - rc.top),
+                    })
+            except Exception:
+                pass
+            return True
+
+        try:
+            cb = MONITORENUMPROC(_cb)
+            user32.EnumDisplayMonitors(None, None, cb, 0)
+        except Exception:
+            pass
+
+        if not raw_mons:
+            sw = max(800, int(user32.GetSystemMetrics(SM_CXSCREEN) or 1920))
+            sh = max(600, int(user32.GetSystemMetrics(SM_CYSCREEN) or 1080))
+            raw_mons.append({
+                "device": "\\\\.\\DISPLAY1",
+                "is_primary": True,
+                "left": 0, "top": 0, "right": sw, "bottom": sh,
+                "work_left": 0, "work_top": 0, "work_right": sw, "work_bottom": sh,
+                "width": sw, "height": sh,
+            })
+
+        # Sort Primary first, then left-to-right top-to-bottom for stable UI numbering
+        raw_mons.sort(key=lambda m: (0 if m["is_primary"] else 1, m["left"], m["top"]))
+        for idx, m in enumerate(raw_mons, 1):
+            m["index"] = idx
+            prim = " · Primary" if m["is_primary"] else ""
+            m["label"] = f"Display {idx}{prim} ({m['width']}×{m['height']})"
+        return raw_mons
+
     def configure_spotlight(self, enabled: Optional[bool] = None,
                             opacity: Optional[float] = None,
                             color_hex: Optional[str] = None,
@@ -370,9 +475,27 @@ class Win32FocusRuler:
                             enable_anim: Optional[bool] = None,
                             anim_ms: Optional[int] = None,
                             current_monitor: Optional[bool] = None,
-                            current_monitor_only: Optional[bool] = None):
+                            current_monitor_only: Optional[bool] = None,
+                            spotlight_scope: Optional[str] = None,
+                            spotlight_target_monitors: Optional[List[str]] = None,
+                            spotlight_other_monitors_100: Optional[bool] = None,
+                            spotlight_pause_on_fullscreen: Optional[bool] = None):
+        global _FORCE_SECONDARY_BLACK
         trans = transition if transition is not None else enable_anim
         cur_mon = current_monitor if current_monitor is not None else current_monitor_only
+
+        scope_val = None
+        if spotlight_scope is not None:
+            s = str(spotlight_scope).strip().lower()
+            if s in ("current", "all_monitors", "selected"):
+                scope_val = s
+                self._spotlight_scope = s
+                self._spotlight_current_monitor = (s == "current")
+        elif cur_mon is not None:
+            self._spotlight_current_monitor = bool(cur_mon)
+            self._spotlight_scope = "current" if self._spotlight_current_monitor else "all_monitors"
+            scope_val = self._spotlight_scope
+
         if opacity is not None:
             self._spotlight_opacity = self._normalize_opacity(opacity)
         if color_hex is not None:
@@ -383,8 +506,13 @@ class Win32FocusRuler:
             self._spotlight_transition = bool(trans)
         if anim_ms is not None:
             self._spotlight_anim_ms = max(50, min(500, int(anim_ms)))
-        if cur_mon is not None:
-            self._spotlight_current_monitor = bool(cur_mon)
+        if spotlight_target_monitors is not None:
+            self._spotlight_target_monitors = [str(m) for m in spotlight_target_monitors if m]
+        if spotlight_other_monitors_100 is not None:
+            self._spotlight_other_100 = bool(spotlight_other_monitors_100)
+            _FORCE_SECONDARY_BLACK = self._spotlight_other_100
+        if spotlight_pause_on_fullscreen is not None:
+            self._spotlight_pause_on_fullscreen = bool(spotlight_pause_on_fullscreen)
 
         if enabled is not None or self._running:
             self._ensure_thread_running()
@@ -396,6 +524,10 @@ class Win32FocusRuler:
                 "transition": trans,
                 "anim_ms": anim_ms,
                 "current_monitor": cur_mon,
+                "spotlight_scope": scope_val,
+                "spotlight_target_monitors": spotlight_target_monitors,
+                "spotlight_other_monitors_100": spotlight_other_monitors_100,
+                "spotlight_pause_on_fullscreen": spotlight_pause_on_fullscreen,
             })
         return self.get_focus_state()
 
@@ -425,6 +557,12 @@ class Win32FocusRuler:
             "spotlight_transition": self._spotlight_transition,
             "spotlight_anim_ms": self._spotlight_anim_ms,
             "spotlight_current_monitor": self._spotlight_current_monitor,
+            "current_monitor_only": self._spotlight_scope == "current",
+            "spotlight_scope": self._spotlight_scope,
+            "spotlight_target_monitors": list(self._spotlight_target_monitors),
+            "spotlight_other_monitors_100": self._spotlight_other_100,
+            "spotlight_pause_on_fullscreen": self._spotlight_pause_on_fullscreen,
+            "monitors": self.enumerate_monitors(),
         }
 
     def destroy(self):
@@ -453,6 +591,7 @@ class Win32FocusRuler:
             self._hwnd_bot = None
             self._hwnd_left = None
             self._hwnd_right = None
+            self._secondary_hwnds.clear()
             self._is_active = False
             self._spotlight_active = False
 
@@ -594,6 +733,7 @@ class Win32FocusRuler:
                 h, op, col = None, None, None
             self._update_internal(h, op, col)
         elif cmd == 'CONFIG_SPOTLIGHT':
+            global _FORCE_SECONDARY_BLACK
             cfg = args or {}
             if cfg.get("opacity") is not None:
                 self._spotlight_opacity = self._normalize_opacity(cfg["opacity"])
@@ -605,8 +745,20 @@ class Win32FocusRuler:
                 self._spotlight_transition = bool(cfg["transition"])
             if cfg.get("anim_ms") is not None:
                 self._spotlight_anim_ms = max(20, min(1000, int(cfg["anim_ms"])))
-            if cfg.get("current_monitor") is not None:
+            if cfg.get("spotlight_scope") is not None:
+                self._spotlight_scope = str(cfg["spotlight_scope"])
+                self._spotlight_current_monitor = (self._spotlight_scope == "current")
+            elif cfg.get("current_monitor") is not None:
                 self._spotlight_current_monitor = bool(cfg["current_monitor"])
+                self._spotlight_scope = "current" if self._spotlight_current_monitor else "all_monitors"
+            if cfg.get("spotlight_target_monitors") is not None:
+                self._spotlight_target_monitors = [str(m) for m in cfg["spotlight_target_monitors"] if m]
+            if cfg.get("spotlight_other_monitors_100") is not None:
+                self._spotlight_other_100 = bool(cfg["spotlight_other_monitors_100"])
+                _FORCE_SECONDARY_BLACK = self._spotlight_other_100
+            if cfg.get("spotlight_pause_on_fullscreen") is not None:
+                self._spotlight_pause_on_fullscreen = bool(cfg["spotlight_pause_on_fullscreen"])
+            self._last_secondary_layout = None
             if cfg.get("enabled") is not None:
                 en = bool(cfg["enabled"])
                 if en:
@@ -648,6 +800,9 @@ class Win32FocusRuler:
         if old_brush:
             gdi32.DeleteObject(old_brush)
         for hw in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
+            if hw:
+                user32.InvalidateRect(hw, None, True)
+        for hw in self._secondary_hwnds.values():
             if hw:
                 user32.InvalidateRect(hw, None, True)
 
@@ -728,12 +883,13 @@ class Win32FocusRuler:
         self._register_class()
         self._update_brush(self._color_hex)
 
-        # Destroy left/right spotlight windows if switching from spotlight mode
+        # Destroy left/right & secondary monitor spotlight windows if switching from spotlight mode
         for attr in ("_hwnd_left", "_hwnd_right"):
             hw = getattr(self, attr)
             if hw:
                 user32.DestroyWindow(hw)
                 setattr(self, attr, None)
+        self._destroy_secondary_hwnds()
 
         pt = wintypes.POINT()
         if user32.GetCursorPos(ctypes.byref(pt)):
@@ -792,12 +948,28 @@ class Win32FocusRuler:
         self._cur_spot_rect = None
         self._track_spotlight_step(force=True)
 
+    def _destroy_secondary_hwnds(self):
+        for dev in list(self._secondary_hwnds.keys()):
+            hw = self._secondary_hwnds.pop(dev, None)
+            if hw:
+                _SECONDARY_BLACK_HWNDS.discard(hw)
+                user32.DestroyWindow(hw)
+        self._last_secondary_layout = None
+
+    def _hide_foreground_spot_windows(self):
+        if self._last_spot_applied is not None:
+            self._last_spot_applied = None
+        for h in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
+            if h and user32.IsWindowVisible(h):
+                user32.ShowWindow(h, 0)
+
     def _disable_internal(self):
         for attr in ("_hwnd_top", "_hwnd_bot", "_hwnd_left", "_hwnd_right"):
             hw = getattr(self, attr)
             if hw:
                 user32.DestroyWindow(hw)
                 setattr(self, attr, None)
+        self._destroy_secondary_hwnds()
         self._is_active = False
         self._cur_spot_rect = None
         self._last_spot_applied = None
@@ -859,6 +1031,58 @@ class Win32FocusRuler:
                 self._current_y = target_y
                 self._reposition()
 
+    def _sync_secondary_monitors(self, secondary_monitors: List[Dict[str, Any]], force: bool = False):
+        if not secondary_monitors:
+            if self._secondary_hwnds:
+                self._destroy_secondary_hwnds()
+            return
+
+        sec_alpha = 255 if self._spotlight_other_100 else int(
+            max(0, min(255, round(self._spotlight_opacity * 255)))
+        )
+        full_cover = bool(self._spotlight_other_100 or self._spotlight_include_taskbar)
+        layout_items = []
+        desired_specs = {}
+        for m in secondary_monitors:
+            dev = m["device"]
+            if full_cover:
+                mx, my, mw, mh = m["left"], m["top"], m["width"], m["height"]
+            else:
+                mx = m["work_left"]
+                my = m["work_top"]
+                mw = max(0, m["work_right"] - m["work_left"])
+                mh = max(0, m["work_bottom"] - m["work_top"])
+            layout_items.append((dev, mx, my, mw, mh, sec_alpha, self._spotlight_other_100))
+            desired_specs[dev] = (mx, my, mw, mh)
+
+        layout_sig = tuple(layout_items)
+        if not force and layout_sig == self._last_secondary_layout:
+            return
+        self._last_secondary_layout = layout_sig
+
+        # Destroy overlays for monitors no longer covered as secondary curtains
+        for stale_dev in [d for d in list(self._secondary_hwnds.keys()) if d not in desired_specs]:
+            hw = self._secondary_hwnds.pop(stale_dev, None)
+            if hw:
+                _SECONDARY_BLACK_HWNDS.discard(hw)
+                user32.DestroyWindow(hw)
+
+        flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW
+        for dev, (mx, my, mw, mh) in desired_specs.items():
+            hw = self._secondary_hwnds.get(dev)
+            if not hw:
+                hw = self._create_overlay_hwnd(f"VGSpotSec_{dev}", mx, my, mw, mh, sec_alpha)
+                if hw:
+                    self._secondary_hwnds[dev] = hw
+            if hw:
+                if self._spotlight_other_100:
+                    _SECONDARY_BLACK_HWNDS.add(hw)
+                else:
+                    _SECONDARY_BLACK_HWNDS.discard(hw)
+                user32.SetLayeredWindowAttributes(hw, 0, sec_alpha, LWA_ALPHA)
+                user32.SetWindowPos(hw, None, mx, my, max(0, mw), max(0, mh), flags)
+                user32.InvalidateRect(hw, None, True)
+
     def _track_spotlight_step(self, force: bool = False):
         if not self._spotlight_active:
             return
@@ -866,50 +1090,94 @@ class Win32FocusRuler:
         if not fg:
             return
 
-        # Game & Fullscreen Guard: auto-pause spotlight overlay over exclusive fullscreen viewports
+        monitors = self.enumerate_monitors()
+        if not monitors:
+            return
+
+        # Identify which monitor currently hosts the foreground window
+        active_mon = monitors[0]
         try:
-            from core.window_focus import is_foreground_fullscreen
-            if is_foreground_fullscreen(fg):
-                self._last_spot_applied = None
-                for h in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
-                    if h and user32.IsWindowVisible(h):
-                        user32.ShowWindow(h, 0)
-                return
-            elif self._hwnd_top and not user32.IsWindowVisible(self._hwnd_top):
-                self._last_spot_applied = None
-                for h in (self._hwnd_top, self._hwnd_bot, self._hwnd_left, self._hwnd_right):
-                    if h:
-                        user32.ShowWindow(h, 4)  # SW_SHOWNOACTIVATE
+            hmon = user32.MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST)
+            if hmon:
+                mi = MONITORINFOEXW()
+                mi.cbSize = ctypes.sizeof(MONITORINFOEXW)
+                if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+                    dev_name = str(mi.szDevice or "")
+                    matched = next((m for m in monitors if m["device"] == dev_name), None)
+                    if matched is None:
+                        rc_m = mi.rcMonitor
+                        matched = {
+                            "device": dev_name or active_mon["device"],
+                            "is_primary": bool(mi.dwFlags & MONITORINFOF_PRIMARY),
+                            "left": int(rc_m.left), "top": int(rc_m.top),
+                            "right": int(rc_m.right), "bottom": int(rc_m.bottom),
+                            "work_left": int(mi.rcWork.left), "work_top": int(mi.rcWork.top),
+                            "work_right": int(mi.rcWork.right), "work_bottom": int(mi.rcWork.bottom),
+                            "width": int(rc_m.right - rc_m.left),
+                            "height": int(rc_m.bottom - rc_m.top),
+                        }
+                    active_mon = matched
         except Exception:
             pass
 
+        active_dev = active_mon["device"]
+
+        # Read active window bounds cleanly (prefer DWM extended frame bounds)
         rc = wintypes.RECT()
-        # Prefer DWMWA_EXTENDED_FRAME_BOUNDS (9) to exclude Windows 10/11 invisible drop shadow
-        hr = dwmapi.DwmGetWindowAttribute(
-            fg, 9, ctypes.byref(rc), ctypes.sizeof(rc)
-        )
+        hr = dwmapi.DwmGetWindowAttribute(fg, 9, ctypes.byref(rc), ctypes.sizeof(rc))
         if hr != 0:
             if not user32.GetWindowRect(fg, ctypes.byref(rc)):
                 return
 
-        # Determine bounds: either the current monitor of the active window or full virtual desktop
-        bx1, by1, bx2, by2 = self._vx, self._vy, self._vx + self._vw, self._vy + self._vh
-        if self._spotlight_current_monitor:
-            hmon = user32.MonitorFromWindow(fg, 2)  # MONITOR_DEFAULTTONEAREST
-            if hmon:
-                mi = MONITORINFO()
-                mi.cbSize = ctypes.sizeof(MONITORINFO)
-                if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
-                    bound_rc = mi.rcMonitor if self._spotlight_include_taskbar else mi.rcWork
-                    bx1, by1, bx2, by2 = bound_rc.left, bound_rc.top, bound_rc.right, bound_rc.bottom
-            elif not self._spotlight_include_taskbar:
-                work_rc = wintypes.RECT()
-                if user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(work_rc), 0):
-                    bx1, by1, bx2, by2 = work_rc.left, work_rc.top, work_rc.right, work_rc.bottom
-        elif not self._spotlight_include_taskbar:
-            work_rc = wintypes.RECT()
-            if user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(work_rc), 0):
-                bx1, by1, bx2, by2 = work_rc.left, work_rc.top, work_rc.right, work_rc.bottom
+        # Distinguish desktop shell vs real fullscreen application (e.g. VLC, Apple TV, games)
+        fg_is_fullscreen = False
+        try:
+            class_buf = ctypes.create_unicode_buffer(64)
+            user32.GetClassNameW(fg, class_buf, 64)
+            if class_buf.value not in (
+                "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
+                "EyeGuardFocusRulerWindowClass", "EyeGuardDesktopOverlayClass", "EyeGuardRulerOverlay",
+            ):
+                win_rc = wintypes.RECT()
+                chk_rc = win_rc if user32.GetWindowRect(fg, ctypes.byref(win_rc)) else rc
+                fg_is_fullscreen = (
+                    chk_rc.left <= active_mon["left"] + 1
+                    and chk_rc.top <= active_mon["top"] + 1
+                    and chk_rc.right >= active_mon["right"] - 1
+                    and chk_rc.bottom >= active_mon["bottom"] - 1
+                )
+        except Exception:
+            pass
+
+        if fg_is_fullscreen and self._spotlight_pause_on_fullscreen:
+            self._hide_foreground_spot_windows()
+            self._sync_secondary_monitors([], force=force)
+            return
+
+        scope = self._spotlight_scope
+        if scope == "current":
+            target_set = {active_dev}
+        elif scope == "all_monitors":
+            target_set = {m["device"] for m in monitors}
+        else:
+            target_set = set(self._spotlight_target_monitors)
+
+        # Keep extended monitors dimmed / 100% black as configured
+        secondary_mons = [
+            m for m in monitors
+            if m["device"] != active_dev and m["device"] in target_set
+        ]
+        self._sync_secondary_monitors(secondary_mons, force=force)
+
+        # Keep active monitor clear when fullscreen video/game fills it OR when excluded by selection
+        if fg_is_fullscreen or (active_dev not in target_set):
+            self._hide_foreground_spot_windows()
+            return
+
+        if self._spotlight_include_taskbar:
+            bx1, by1, bx2, by2 = active_mon["left"], active_mon["top"], active_mon["right"], active_mon["bottom"]
+        else:
+            bx1, by1, bx2, by2 = active_mon["work_left"], active_mon["work_top"], active_mon["work_right"], active_mon["work_bottom"]
 
         tx1 = float(max(bx1, min(bx2, rc.left)))
         ty1 = float(max(by1, min(by2, rc.top)))
@@ -920,7 +1188,6 @@ class Win32FocusRuler:
             self._cur_spot_rect = (tx1, ty1, tx2, ty2)
         else:
             cx1, cy1, cx2, cy2 = self._cur_spot_rect
-            # Smooth exponential interpolation factor based on animation duration
             frames = max(1.0, (self._spotlight_anim_ms / 1000.0) * 60.0)
             alpha = min(1.0, 3.0 / frames)
             nx1 = cx1 + (tx1 - cx1) * alpha

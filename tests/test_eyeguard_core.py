@@ -880,6 +880,158 @@ class TestBreakAndToastWindowBehavior(unittest.TestCase):
                 self.assertEqual(st2["cycles_before_long"], 3)
                 self.assertEqual(st2["long_break_minutes"], 22)
 
+    def test_spotlight_opacity_100pct_and_fullscreen_multi_monitor_blackout(self):
+        from core import win32_ruler
+
+        self.assertEqual(win32_ruler.Win32FocusRuler._normalize_opacity(100), 1.0)
+        self.assertEqual(win32_ruler.Win32FocusRuler._normalize_opacity(1.0), 1.0)
+
+        ruler = win32_ruler.Win32FocusRuler()
+        self.addCleanup(ruler.destroy)
+
+        monitors = [
+            {
+                "device": "\\\\.\\DISPLAY1", "index": 1, "is_primary": True,
+                "label": "Display 1 · Primary (1920×1080)",
+                "left": 0, "top": 0, "right": 1920, "bottom": 1080,
+                "work_left": 0, "work_top": 0, "work_right": 1920, "work_bottom": 1040,
+                "width": 1920, "height": 1080,
+            },
+            {
+                "device": "\\\\.\\DISPLAY2", "index": 2, "is_primary": False,
+                "label": "Display 2 (2560×1440)",
+                "left": 1920, "top": 0, "right": 4480, "bottom": 1440,
+                "work_left": 1920, "work_top": 0, "work_right": 4480, "work_bottom": 1400,
+                "width": 2560, "height": 1440,
+            },
+            {
+                "device": "\\\\.\\DISPLAY3", "index": 3, "is_primary": False,
+                "label": "Display 3 (1920×1080)",
+                "left": 4480, "top": 0, "right": 6400, "bottom": 1080,
+                "work_left": 4480, "work_top": 0, "work_right": 6400, "work_bottom": 1040,
+                "width": 1920, "height": 1080,
+            },
+        ]
+
+        # Avoid spawning/altering real desktop overlays during test
+        ruler._spotlight_active = True
+        ruler._spotlight_scope = "all_monitors"
+        ruler._spotlight_other_100 = True
+        ruler._spotlight_pause_on_fullscreen = False
+        ruler._hwnd_top = 101
+        ruler._hwnd_bot = 102
+        ruler._hwnd_left = 103
+        ruler._hwnd_right = 104
+
+        synced_monitors = []
+        hid_fg = []
+
+        def fake_sync(mons, force=False):
+            synced_monitors.clear()
+            synced_monitors.extend(mons)
+
+        def fake_hide():
+            hid_fg.append(True)
+
+        def fill_fullscreen_rect(hwnd, rect_ptr):
+            rc_obj = ctypes.cast(rect_ptr, ctypes.POINTER(win32_ruler.wintypes.RECT)).contents
+            rc_obj.left, rc_obj.top, rc_obj.right, rc_obj.bottom = 0, 0, 1920, 1080
+            return 1
+
+        with patch.object(ruler, "enumerate_monitors", return_value=monitors), \
+             patch.object(ruler, "_sync_secondary_monitors", side_effect=fake_sync), \
+             patch.object(ruler, "_hide_foreground_spot_windows", side_effect=fake_hide), \
+             patch.object(win32_ruler.user32, "GetForegroundWindow", return_value=999), \
+             patch.object(win32_ruler.user32, "MonitorFromWindow", return_value=0), \
+             patch.object(win32_ruler.dwmapi, "DwmGetWindowAttribute", return_value=-1), \
+             patch.object(win32_ruler.user32, "GetWindowRect", side_effect=fill_fullscreen_rect), \
+             patch.object(win32_ruler.user32, "GetClassNameW", return_value=7):
+            ruler._track_spotlight_step(force=True)
+            # Active fullscreen monitor must stay completely clear while all other displays blackout
+            self.assertEqual(len(hid_fg), 1)
+            self.assertEqual([m["device"] for m in synced_monitors], ["\\\\.\\DISPLAY2", "\\\\.\\DISPLAY3"])
+
+            # Selected monitors mode: user chooses only DISPLAY3
+            ruler._spotlight_scope = "selected"
+            ruler._spotlight_target_monitors = ["\\\\.\\DISPLAY3"]
+            ruler._track_spotlight_step(force=True)
+            self.assertEqual([m["device"] for m in synced_monitors], ["\\\\.\\DISPLAY3"])
+
+    def test_preset_override_custom_presets_and_crash_recovery_backup(self):
+        import app as app_mod
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            real_cm = cfg_mod.ConfigManager(config_dir=tmpdir)
+            with patch.object(app_mod, "ConfigManager", return_value=real_cm), \
+                 patch.object(app_mod, "EyeGuardGammaEngine") as MockGamma, \
+                 patch.object(app_mod, "DesktopOverlayManager"), \
+                 patch.object(app_mod, "Win32FocusRuler"), \
+                 patch.object(app_mod, "MagicWindowEngine"), \
+                 patch.object(app_mod, "HotkeyEngine"), \
+                 patch.object(app_mod, "TrayManager"), \
+                 patch("core.system_events.SystemEventsMonitor"):
+                mock_eng = MockGamma.return_value
+                mock_eng.get_monitors.return_value = []
+                mock_eng.get_hardware_brightness.return_value = 80
+                mock_eng.get_active_backend.return_value = "hardware_lut"
+
+                eg = app_mod.EyeGuardApp()
+                self.addCleanup(eg.hard_exit)
+
+                # Modify a built-in preset locally (user has overly bright monitor)
+                res_edit = eg.save_custom_preset("Health", 4200, 48, is_custom=False)
+                self.assertTrue(res_edit["ok"])
+                applied = eg.apply_preset_name("Health")
+                self.assertEqual((applied["kelvin"], applied["brightness"]), (4200, 48))
+
+                # Create a custom user preset
+                res_cust = eg.save_custom_preset("OLED Night Cinema", 3100, 32, is_custom=True)
+                self.assertTrue(res_cust["ok"])
+                applied_cust = eg.apply_preset_name("OLED Night Cinema")
+                self.assertEqual((applied_cust["kelvin"], applied_cust["brightness"]), (3100, 32))
+
+                # Export portable backup file
+                exp_path = Path(tmpdir) / "user_manual_backup.json"
+                exp_res = eg.export_presets_backup(dest_path=str(exp_path))
+                self.assertTrue(exp_res["ok"])
+                self.assertTrue(exp_path.exists())
+
+            # Simulate unexpected crash leaving config.json corrupt on disk
+            real_cm.config_path.write_text("{corrupt_crash_truncated", encoding="utf-8")
+
+            # Restart ConfigManager -> must automatically recover custom & edited presets from backup!
+            recovered_cm = cfg_mod.ConfigManager(config_dir=tmpdir)
+            self.assertTrue(recovered_cm._recovered_from_backup)
+            self.assertEqual(recovered_cm.get("presets", "Health", "kelvin"), 4200)
+            self.assertEqual(recovered_cm.get("presets", "Health", "brightness"), 48)
+            self.assertEqual(recovered_cm.get("custom_presets", "OLED Night Cinema", "kelvin"), 3100)
+            self.assertEqual(recovered_cm.get("custom_presets", "OLED Night Cinema", "brightness"), 32)
+
+            # Reset built-in defaults preserves custom user presets and can restore exported backup
+            with patch.object(app_mod, "ConfigManager", return_value=recovered_cm), \
+                 patch.object(app_mod, "EyeGuardGammaEngine") as MockGamma2, \
+                 patch.object(app_mod, "DesktopOverlayManager"), \
+                 patch.object(app_mod, "Win32FocusRuler"), \
+                 patch.object(app_mod, "MagicWindowEngine"), \
+                 patch.object(app_mod, "HotkeyEngine"), \
+                 patch.object(app_mod, "TrayManager"), \
+                 patch("core.system_events.SystemEventsMonitor"):
+                mock_eng2 = MockGamma2.return_value
+                mock_eng2.get_monitors.return_value = []
+                mock_eng2.get_hardware_brightness.return_value = 80
+                mock_eng2.get_active_backend.return_value = "hardware_lut"
+
+                eg2 = app_mod.EyeGuardApp()
+                self.addCleanup(eg2.hard_exit)
+                defs = eg2.reset_presets_to_default()
+                self.assertEqual(defs["Health"]["brightness"], 85)
+                self.assertIn("OLED Night Cinema", recovered_cm.get("custom_presets", default={}))
+
+                # Restore exported snapshot -> brings Health back to 4200K / 48%
+                imp_res = eg2.import_presets_backup(src_path=str(exp_path))
+                self.assertTrue(imp_res["ok"])
+                self.assertEqual(recovered_cm.get("presets", "Health", "brightness"), 48)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -155,8 +155,17 @@ def is_any_process_running(target_names: set) -> bool:
     return False
 
 
+class _WFMONITORINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    ]
+
+
 def is_foreground_fullscreen(hwnd: Optional[int] = None) -> bool:
-    """Checks if the target (or foreground) application window is running in true fullscreen mode."""
+    """Checks if the target (or foreground) application window is running in true fullscreen mode on its monitor."""
     hwnd = hwnd or user32.GetForegroundWindow()
     if not hwnd:
         return False
@@ -166,13 +175,30 @@ def is_foreground_fullscreen(hwnd: Optional[int] = None) -> bool:
         "Progman",
         "WorkerW",
         "Shell_TrayWnd",
+        "Shell_SecondaryTrayWnd",
         "EyeGuardFocusRulerWindowClass",
         "EyeGuardDesktopOverlayClass",
+        "EyeGuardRulerOverlay",
     ):
         return False
     rc = wintypes.RECT()
     if not user32.GetWindowRect(hwnd, ctypes.byref(rc)):
         return False
+    try:
+        hmon = user32.MonitorFromWindow(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
+        if hmon:
+            mi = _WFMONITORINFO()
+            mi.cbSize = ctypes.sizeof(_WFMONITORINFO)
+            if user32.GetMonitorInfoW(hmon, ctypes.byref(mi)):
+                mrc = mi.rcMonitor
+                return (
+                    rc.left <= mrc.left + 1
+                    and rc.top <= mrc.top + 1
+                    and rc.right >= mrc.right - 1
+                    and rc.bottom >= mrc.bottom - 1
+                )
+    except Exception:
+        pass
     sw = user32.GetSystemMetrics(0)
     sh = user32.GetSystemMetrics(1)
     return rc.left <= 0 and rc.top <= 0 and rc.right >= sw and rc.bottom >= sh
