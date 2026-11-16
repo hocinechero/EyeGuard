@@ -1032,6 +1032,30 @@ class TestBreakAndToastWindowBehavior(unittest.TestCase):
                 self.assertTrue(imp_res["ok"])
                 self.assertEqual(recovered_cm.get("presets", "Health", "brightness"), 48)
 
+    def test_gamma_engine_and_win32_ruler_coexist_without_ctypes_conflict(self):
+        from core import win32_ruler
+
+        eng = gamma_engine.EyeGuardGammaEngine()
+        ruler = win32_ruler.Win32FocusRuler()
+        self.addCleanup(eng.shutdown)
+        self.addCleanup(ruler.destroy)
+
+        # Must enumerate monitors cleanly in both engines without ctypes.ArgumentError
+        ge_mons = eng.get_monitors()
+        ruler_mons = ruler.enumerate_monitors()
+        self.assertIsInstance(ge_mons, list)
+        self.assertGreaterEqual(len(ge_mons), 1)
+        self.assertGreaterEqual(len(ruler_mons), 1)
+
+        # Applying color temperature and brightness through real worker must update backend
+        eng.set_display(3200, 65, smooth=False)
+        self.assertTrue(eng.wait_idle(2.0))
+        self.assertNotEqual(eng.get_active_backend(), "identity")
+        self.assertEqual(eng._applied_kelvin, 3200.0)
+        self.assertAlmostEqual(eng._applied_brightness, 0.65, places=3)
+        eng.reset()
+        self.assertTrue(eng.wait_idle(2.0))
+
 
 if __name__ == "__main__":
     unittest.main()

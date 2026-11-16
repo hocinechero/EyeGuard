@@ -14,10 +14,12 @@ import time
 from ctypes import wintypes
 from typing import Optional, Tuple, Dict, Any, List
 
-user32 = ctypes.windll.user32
-kernel32 = ctypes.windll.kernel32
-gdi32 = ctypes.windll.gdi32
-dwmapi = ctypes.windll.dwmapi
+# Use private WinDLL wrappers so argtypes/restype definitions never collide with
+# other modules sharing ctypes.windll (e.g., EnumDisplayMonitors callbacks in gamma_engine).
+user32 = ctypes.WinDLL("user32")
+kernel32 = ctypes.WinDLL("kernel32")
+gdi32 = ctypes.WinDLL("gdi32")
+dwmapi = ctypes.WinDLL("dwmapi")
 
 CCHDEVICENAME = 32
 MONITORINFOF_PRIMARY = 0x00000001

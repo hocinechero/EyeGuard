@@ -39,13 +39,13 @@ winget install hocinechero.EyeGuard
 
 | Package | Description | Direct Download | SHA-256 Verification |
 | :--- | :--- | :---: | :---: |
-| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.1/EyeGuard_Portable.zip) | [`D45B35FA...8A33706B`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1) |
-| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.1/EyeGuard_Setup.exe) | [`DC073D36...627032D5`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1) |
+| ⚡ **EyeGuard Portable** | **No installation required.** Extract and run `EyeGuard.exe` directly from desktop or USB drive. | [📥 **Download EyeGuard_Portable.zip**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.1/EyeGuard_Portable.zip) | [`0B6EC942...1D818B9E`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1) |
+| 📦 **EyeGuard Installer** | Complete Windows setup wizard with Start Menu shortcuts and optional auto-start. | [📥 **Download EyeGuard_Setup.exe**](https://github.com/hocinechero/EyeGuard/releases/download/v4.0.1/EyeGuard_Setup.exe) | [`0E298ADF...86218495`](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1) |
 | 🪟 **Winget Package** | Official Windows Package Manager distribution ([`PR #479611`](https://github.com/microsoft/winget-pkgs/pull/479611)). | `winget install hocinechero.EyeGuard` | Microsoft Pipeline |
 
 **v4.0.1 Release SHA-256 Checksums** ([GitHub Release](https://github.com/hocinechero/EyeGuard/releases/tag/v4.0.1)):
-- `EyeGuard_Portable.zip` (`48,440,388` bytes): `D45B35FAC6E5A0BDD355294C6AD2508C90DAC225BD8D84CA9348976F8A33706B`
-- `EyeGuard_Setup.exe` (`39,511,855` bytes): `DC073D366CCF262B1688B67E568644AFB0B153513DCD7A9D392E3AB2627032D5`
+- `EyeGuard_Portable.zip` (`48,440,602` bytes): `0B6EC942291E1A6BF83538371CC575955BB8FF41CC78E42D2ADD22A11D818B9E`
+- `EyeGuard_Setup.exe` (`39,513,028` bytes): `0E298ADFC922318AD4C6B2A2C962195CAB241B35A264E55A2A596B1386218495`
 
 </div>
 
