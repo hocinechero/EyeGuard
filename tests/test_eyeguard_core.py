@@ -1056,6 +1056,57 @@ class TestBreakAndToastWindowBehavior(unittest.TestCase):
         eng.reset()
         self.assertTrue(eng.wait_idle(2.0))
 
+    def test_startup_env_diagnostics_and_webview2_fallback(self):
+        from core import startup_env
+
+        self.assertEqual(startup_env.parse_version_tuple("157.0.4341.46"), (157, 0, 4341, 46))
+        self.assertTrue(startup_env.is_version_at_least("109.0.1518.78", (86, 0, 622, 0)))
+        self.assertFalse(startup_env.is_version_at_least("85.0.0.1", (86, 0, 622, 0)))
+
+        # Verify crash log and native fault log creation in isolated temp dir
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_dir = Path(tmpdir) / "logs"
+            fault_path = startup_env.enable_native_fault_handler(log_dir=log_dir)
+            self.assertIsNotNone(fault_path)
+            self.assertTrue(fault_path.exists())
+            try:
+                raise RuntimeError("synthetic startup crash test")
+            except RuntimeError as exc:
+                err_log = startup_env.write_startup_log("Test failure", exc=exc, log_dir=log_dir)
+            self.assertIsNotNone(err_log)
+            txt = err_log.read_text(encoding="utf-8")
+            self.assertIn("synthetic startup crash test", txt)
+            self.assertIn("WebView2 Runtime:", txt)
+            # Release faulthandler cleanly so temp dir deletes on Windows
+            import faulthandler as fh
+            fh.disable()
+            if startup_env._FAULT_LOG_HANDLE is not None:
+                startup_env._FAULT_LOG_HANDLE.close()
+                startup_env._FAULT_LOG_HANDLE = None
+
+        # Verify preflight fails gracefully without hanging or opening dialogs when non-interactive
+        with patch.object(startup_env, "detect_dotnet_framework", return_value=(False, None, "missing")), \
+             patch.object(startup_env, "write_startup_log", return_value=Path("fake.log")) as m_log, \
+             patch.object(startup_env, "show_native_error_box") as m_box:
+            ok, path, info = startup_env.preflight_gui_runtime(interactive=False)
+            self.assertFalse(ok)
+            self.assertIsNone(path)
+            self.assertFalse(info["dotnet_ok"])
+            m_log.assert_called_once()
+            m_box.assert_not_called()
+
+        # Verify WebView2 filesystem fallback returns folder path when registry lookup fails
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app_root = Path(tmpdir) / "Microsoft" / "EdgeWebView" / "Application" / "124.0.2478.80"
+            app_root.mkdir(parents=True, exist_ok=True)
+            (app_root / "msedgewebview2.exe").write_bytes(b"MZ")
+            with patch.object(startup_env, "_read_reg_pv", return_value=None), \
+                 patch.dict(os.environ, {"ProgramFiles(x86)": tmpdir, "ProgramFiles": tmpdir, "LOCALAPPDATA": tmpdir}, clear=False):
+                found, ver, custom_dir = startup_env.detect_webview2_runtime()
+                self.assertTrue(found)
+                self.assertEqual(ver, "124.0.2478.80")
+                self.assertEqual(custom_dir, str(app_root))
+
 
 if __name__ == "__main__":
     unittest.main()

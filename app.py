@@ -4,12 +4,15 @@ import os
 import sys
 
 # Direct Chromium flags for WebView2: forces razor-sharp grayscale font rendering without color fringing
-os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = (
+_wv2_browser_args = (
     "--disable-lcd-text "
     "--force-color-profile=srgb "
     "--disable-font-subpixel-positioning "
     "--enable-font-antialiasing"
 )
+if "--disable-gpu" in sys.argv or os.environ.get("EYEGUARD_DISABLE_GPU") == "1":
+    _wv2_browser_args += " --disable-gpu --disable-gpu-compositing"
+os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = _wv2_browser_args
 
 import threading
 import time
@@ -2710,21 +2713,117 @@ class JSBridgeApi:
         return self.check_for_updates()
 
 
+_WAKE_EVENT_NAME = "Local\\EyeGuard_Wake_Event"
+_READY_EVENT_NAME = "Local\\EyeGuard_Ready_Event"
+
+
+def _resolve_app_asset(*rel_parts) -> Optional[str]:
+    candidates = [
+        os.path.join(BASE_DIR, *rel_parts),
+        os.path.join(BASE_DIR, "_internal", *rel_parts),
+        os.path.join(os.path.dirname(sys.executable), *rel_parts),
+        os.path.join(os.path.dirname(sys.executable), "_internal", *rel_parts),
+    ]
+    return next((p for p in candidates if os.path.exists(p)), None)
+
+
 def enforce_single_instance():
-    user32 = ctypes.windll.user32
-    kernel32 = ctypes.windll.kernel32
-    mutex = kernel32.CreateMutexW(None, True, "EyeGuard_SingleInstance_Mutex")
-    if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-        hwnd = user32.FindWindowW(None, "EyeGuard")
+    u32 = ctypes.WinDLL("user32", use_last_error=True)
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+    k32.CreateMutexW.restype = wintypes.HANDLE
+    k32.OpenEventW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+    k32.OpenEventW.restype = wintypes.HANDLE
+    k32.SetEvent.argtypes = [wintypes.HANDLE]
+    k32.SetEvent.restype = wintypes.BOOL
+    k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    k32.WaitForSingleObject.restype = wintypes.DWORD
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    k32.CloseHandle.restype = wintypes.BOOL
+
+    mutex = k32.CreateMutexW(None, True, "EyeGuard_SingleInstance_Mutex")
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        if mutex:
+            k32.CloseHandle(mutex)
+
+        # Wait briefly if the first instance is still initializing on a slower PC
+        ready_evt = k32.OpenEventW(0x00100000, False, _READY_EVENT_NAME)  # SYNCHRONIZE
+        ready_ok = False
+        if ready_evt:
+            try:
+                ready_ok = k32.WaitForSingleObject(ready_evt, 2500) == 0
+            finally:
+                k32.CloseHandle(ready_evt)
+
+        wake_evt = k32.OpenEventW(0x00000002, False, _WAKE_EVENT_NAME)  # EVENT_MODIFY_STATE
+        woke = False
+        if wake_evt:
+            try:
+                woke = bool(k32.SetEvent(wake_evt))
+            finally:
+                k32.CloseHandle(wake_evt)
+
+        hwnd = u32.FindWindowW(None, "EyeGuard")
         if hwnd:
-            user32.ShowWindow(hwnd, 9)  # SW_RESTORE = 9
-            user32.SetForegroundWindow(hwnd)
+            u32.ShowWindow(hwnd, 5)  # SW_SHOW
+            u32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            u32.SetForegroundWindow(hwnd)
+        elif not woke and not ready_ok:
+            from core.startup_env import MB_ICONWARNING, MB_OK, show_native_error_box, write_startup_log
+
+            log_path = write_startup_log(
+                "Detected EyeGuard_SingleInstance_Mutex held without an active UI/Ready signal.",
+                app_version=EyeGuardApp.VERSION,
+            )
+            msg = (
+                "EyeGuard appears to already have a background process stuck during startup.\n\n"
+                "Please end any running 'EyeGuard.exe' in Task Manager (or check the system tray) "
+                "and try launching again."
+            )
+            if log_path:
+                msg += f"\n\nDiagnostics log:\n{log_path}"
+            show_native_error_box("EyeGuard — Already Running", msg, MB_OK | MB_ICONWARNING)
         sys.exit(0)
     return mutex
 
 
 def run_app():
+    from core.startup_env import (
+        MB_ICONWARNING,
+        MB_OK,
+        preflight_gui_runtime,
+        show_native_error_box,
+        write_startup_log,
+    )
+
     single_mutex = enforce_single_instance()
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateEventW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
+    k32.CreateEventW.restype = wintypes.HANDLE
+    k32.SetEvent.argtypes = [wintypes.HANDLE]
+    k32.SetEvent.restype = wintypes.BOOL
+    k32.ReleaseMutex.argtypes = [wintypes.HANDLE]
+    k32.ReleaseMutex.restype = wintypes.BOOL
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    k32.CloseHandle.restype = wintypes.BOOL
+    k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    k32.WaitForSingleObject.restype = wintypes.DWORD
+
+    ok, custom_wv2_path, _info = preflight_gui_runtime(
+        interactive=True, app_version=EyeGuardApp.VERSION
+    )
+    if not ok:
+        if single_mutex:
+            k32.ReleaseMutex(single_mutex)
+            k32.CloseHandle(single_mutex)
+        sys.exit(1)
+
+    if custom_wv2_path:
+        webview.settings["WEBVIEW2_RUNTIME_PATH"] = custom_wv2_path
+
+    ready_evt = k32.CreateEventW(None, True, False, _READY_EVENT_NAME)
+    wake_evt = k32.CreateEventW(None, False, False, _WAKE_EVENT_NAME)
+
     app = EyeGuardApp()
     api = JSBridgeApi(app)
 
@@ -2741,16 +2840,13 @@ def run_app():
     )
     app._schedule_tray_update()
 
-    candidate_paths = [
-        os.path.join(BASE_DIR, "web", "index.html"),
-        os.path.join(BASE_DIR, "_internal", "web", "index.html"),
-        os.path.join(os.path.dirname(sys.executable), "web", "index.html"),
-        os.path.join(os.path.dirname(sys.executable), "_internal", "web", "index.html"),
-        os.path.join(os.path.dirname(sys.executable), "web", "index.html"),
-    ]
-    html_file = next(
-        (p for p in candidate_paths if os.path.exists(p)), candidate_paths[0]
-    )
+    html_file = _resolve_app_asset("web", "index.html")
+    if not html_file:
+        raise FileNotFoundError(
+            "UI resource 'web/index.html' was not found. If running the portable build, "
+            "extract the entire ZIP folder before launching EyeGuard.exe."
+        )
+    app_icon = _resolve_app_asset("assets", "app_icon.ico")
 
     # Determine initial window size based on screen workarea
     work_rc = wintypes.RECT()
@@ -2788,10 +2884,61 @@ def run_app():
 
     app._window.events.closing += on_closing
 
-    webview.start(storage_path=app.data_dir)
+    def _wake_listener():
+        while not app._closing and wake_evt:
+            res = k32.WaitForSingleObject(wake_evt, 1000)
+            if res == 0 and not app._closing:
+                try:
+                    app.show_window()
+                except Exception:
+                    pass
+
+    if wake_evt:
+        threading.Thread(target=_wake_listener, name="EyeGuard-WakeListener", daemon=True).start()
+
+    def _on_gui_loop_started():
+        if ready_evt:
+            k32.SetEvent(ready_evt)
+        try:
+            shown = app._window.events.shown.wait(15.0)
+        except Exception:
+            shown = True
+        if not shown and not app._closing:
+            log_path = write_startup_log(
+                "PyWebView window did not become visible within 15s (WebView2/GPU initialization delay or failure).",
+                app_version=EyeGuardApp.VERSION,
+            )
+            msg = (
+                "EyeGuard started in the background, but its interface window failed to display.\n\n"
+                "Try launching 'EyeGuard.exe --disable-gpu' from Command Prompt or repairing "
+                "Microsoft Edge WebView2 Runtime."
+            )
+            if log_path:
+                msg += f"\n\nDiagnostics log:\n{log_path}"
+            show_native_error_box("EyeGuard — Display Warning", msg, MB_OK | MB_ICONWARNING)
+
+    start_kwargs = {"func": _on_gui_loop_started, "storage_path": app.data_dir}
+    if app_icon and os.path.isfile(app_icon):
+        start_kwargs["icon"] = app_icon
+
+    try:
+        webview.start(**start_kwargs)
+    finally:
+        if ready_evt:
+            k32.CloseHandle(ready_evt)
+        if wake_evt:
+            k32.CloseHandle(wake_evt)
+        if single_mutex:
+            try:
+                k32.ReleaseMutex(single_mutex)
+            except Exception:
+                pass
+            k32.CloseHandle(single_mutex)
 
 
 if __name__ == "__main__":
+    if "--disable-gpu" in sys.argv:
+        os.environ["EYEGUARD_DISABLE_GPU"] = "1"
     if len(sys.argv) >= 4 and sys.argv[1] == "--crash-guard":
         from core.crash_guard import run_watchdog
         run_watchdog(int(sys.argv[2]), sys.argv[3])
