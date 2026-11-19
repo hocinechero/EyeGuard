@@ -3,6 +3,7 @@ import sys
 import subprocess
 import shutil
 import hashlib
+import struct
 import time
 import zipfile
 
@@ -11,12 +12,45 @@ DESKTOP = r"C:\Users\dell\Desktop"
 ISCC = r"C:\Users\dell\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
 PYTHON = sys.executable
 
-def run(cmd, cwd=SRC_DIR):
+def run(cmd, cwd=SRC_DIR, env=None):
     print(f"--> Running: {cmd if isinstance(cmd, str) else ' '.join(cmd)}")
-    res = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str))
+    res = subprocess.run(cmd, cwd=cwd, shell=isinstance(cmd, str), env=env)
     if res.returncode != 0:
         print(f"FAILED (code {res.returncode}): {cmd}")
         sys.exit(res.returncode)
+
+
+def verify_baseline_x86_64_pe(exe_path):
+    """Ensures compiled executable .text contains zero AVX/VEX YMM instructions (prevents 0xC000001D on non-AVX CPUs)."""
+    with open(exe_path, "rb") as f:
+        data = f.read()
+    e_lfanew = struct.unpack_from("<I", data, 0x3C)[0]
+    coff = e_lfanew + 4
+    _, num_sec, _, _, _, opt_size, _ = struct.unpack_from("<HHIIIHH", data, coff)
+    opt = coff + 20
+    text_bytes = b""
+    for i in range(num_sec):
+        s = data[opt + opt_size + i * 40 : opt + opt_size + (i + 1) * 40]
+        if s[:8].rstrip(b"\x00") == b".text":
+            vsize, _, _, ra = struct.unpack_from("<IIII", s, 8)
+            text_bytes = data[ra : ra + vsize]
+            break
+    if not text_bytes:
+        raise RuntimeError(f"Could not locate .text section in {exe_path}")
+    forbidden = {
+        "vmovups_ymm_load": b"\xc5\xfc\x10",
+        "vmovups_ymm_store": b"\xc5\xfc\x11",
+        "vmovdqu_ymm_load": b"\xc5\xfe\x6f",
+        "vmovdqu_ymm_store": b"\xc5\xfe\x7f",
+        "vzeroupper": b"\xc5\xf8\x77",
+    }
+    hits = {name: text_bytes.count(sig) for name, sig in forbidden.items() if text_bytes.count(sig) > 0}
+    if hits:
+        raise RuntimeError(
+            f"Baseline x86_64 verification FAILED for {exe_path}: detected non-baseline AVX opcodes {hits}. "
+            "Ensure LDFLAGS includes -march=x86_64 when linking with Zig."
+        )
+    print(f"Baseline x86_64 ISA check PASSED for {os.path.basename(exe_path)} (.text={len(text_bytes)} bytes, 0 AVX opcodes).")
 
 def kill_running():
     print("Terminating running EyeGuard processes...")
@@ -82,6 +116,11 @@ def main():
     ]
 
     print("\n=== STEP 1: Nuitka Standalone Compilation ===")
+    build_env = os.environ.copy()
+    existing_ldflags = build_env.get("LDFLAGS", "").strip()
+    if "-march=x86_64" not in existing_ldflags:
+        build_env["LDFLAGS"] = (existing_ldflags + " -march=x86_64").strip()
+
     nuitka_standalone = [
         PYTHON, "-m", "nuitka",
         "--standalone",
@@ -90,9 +129,10 @@ def main():
         "--output-filename=EyeGuard.exe",
         "run_eyeguard.py"
     ]
-    run(nuitka_standalone)
+    run(nuitka_standalone, env=build_env)
 
     compiled_dist = os.path.join(SRC_DIR, "dist_nuitka", "run_eyeguard.dist")
+    verify_baseline_x86_64_pe(os.path.join(compiled_dist, "EyeGuard.exe"))
     target_dist = os.path.join(SRC_DIR, "dist", "EyeGuard")
     if os.path.exists(target_dist):
         shutil.rmtree(target_dist)
